@@ -1,2 +1,3 @@
-# metal-template
-A template to create new repos from.
+# Pre-Install Toolkit
+
+This repo contains scripts and various configuration files for running on a Cray Pre-Install Toolkit, or for emulating such an environment.
