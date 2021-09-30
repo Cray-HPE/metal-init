@@ -1,7 +1,7 @@
 #!/bin/bash
 LOG_DIR=/var/log/metal/
 trap 'echo See logs for contacted nodes in $LOG_DIR' EXIT INT HUP TERM
-set -ux
+set -u
 
 bmc_username=${USERNAME:-$(whoami)}
 if [[ $(hostname) == *-pit ]]; then
