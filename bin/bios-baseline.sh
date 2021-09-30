@@ -11,8 +11,6 @@ else
 fi
 mkdir -pv $LOG_DIR
 
-alias ilorest='ilorest --nologo'
-
 HPE_CONF="$(dirname $0)/$(basename $0 | cut -d '.' -f1 | sed 's/-/-hpe-/g').ini"
 
 # Lay of the Land; rules to abide by for reusable code, and easy identification of problems from new eyeballs.
@@ -55,17 +53,17 @@ bmc_password=${IPMI_PASSWORD:-''}
 function ilo_config() {
     check_compatibility HPE || warn -
     local respecs
-    respecs=$(ilorest list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS. | diff --side-by-side --left-column bios-hpe-baseline.ini - | awk '{print $NF}' | grep '=' | cut -d '=' -f1 | tr -s '\n' '|' | sed 's/|$//g')
+    respecs=$(ilorest --nologo list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS. | diff --side-by-side --left-column $HPE_CONF - | awk '{print $NF}' | grep '=' | cut -d '=' -f1 | tr -s '\n' '|' | sed 's/|$//g')
     [ -z "$respecs" ] && return 0
-    eval ilorest set $(grep -E "($respecs)" $HPE_CONF | xargs -i echo \"{}\" | tr -s '\n' ' ') --selector=Bios. --commit
-    ilorest pending
+    eval ilorest --nologo set $(grep -E "($respecs)" $HPE_CONF | xargs -i echo \"{}\" | tr -s '\n' ' ') --selector=Bios. --commit
+    ilorest --nologo pending
 }
 
 function ilo_verify() {
     check_compatibility HPE || warn -
-    # Without set -e or set -x or set -? this conditional doesn't wait for the return from ilorest.
+    # Without set -e or set -x or set -? this conditional doesn't wait for the return from ilorest --nologo.
     set -e
-    [ "$(cat $HPE_CONF)" = "$(ilorest list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS.)" ]
+    [ "$(cat $HPE_CONF)" = "$(ilorest --nologo list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS.)" ]
     set +e
 }
 
@@ -81,14 +79,14 @@ function run_ilo() {
     for ncn_bmc in $(grep -oP 'ncn-\w\d+-mgmt' $hosts_file | sort -u | grep -v ncn-m001-mgmt); do
         echo "================================"; printf "Checking ${ncn_bmc} ... "
 
-        ilorest login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
+        ilorest --nologo login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
         if ilo_verify = "0" ; then
             echo "up-to-spec"
         else
             echo "differs from spec"
             need_recon+=( "$ncn_bmc" )
         fi
-        ilorest logout 2>&1 >/dev/null
+        ilorest --nologo logout 2>&1 >/dev/null
     done
 
     # if running in Jenkins or if -y was given just continue.
@@ -112,22 +110,21 @@ function run_ilo() {
     fi
     for ncn_bmc in ${need_recon[@]}; do
         echo "================================"; printf "Configuring ${ncn_bmc} ... "
-        ilorest login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
+        ilorest --nologo login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
 
         ilo_config 2>&1 >$LOG_DIR/${ncn_bmc}.log
         echo 'done'
     done
 
-    echo "================================"; printf "Checking ${host_bmc} ... "
-    ilorest login -u ${bmc_username} -p ${bmc_password} >/dev/null
+    echo "================================"; printf "Checking (self) ${host_bmc} ... "
+    ilorest --nologo login -u ${bmc_username} -p ${bmc_password} >/dev/null
         if [ ilo_verify = "0" ] ; then
             echo "up-to-spec"
         else
             echo "differs from spec"
-            printf "Checking ${host_bmc} ... "
             ilo_config 2>&1 >$LOG_DIR/${ncn_bmc}.log
         fi
-    ilorest logout 2>&1 >/dev/null
+    ilorest --nologo logout 2>&1 >/dev/null
     echo "Settings will apply on the next (re)boot of each NCN: ${need_recon[@]}"
 }
 
