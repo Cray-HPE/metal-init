@@ -1,7 +1,10 @@
 #!/bin/bash
 LOG_DIR=/var/log/metal/
 trap 'echo See logs for contacted nodes in $LOG_DIR' EXIT INT HUP TERM
+
 set -u
+set -o pipefail
+
 
 bmc_username=${USERNAME:-$(whoami)}
 if [[ $(hostname) == *-pit ]]; then
@@ -53,6 +56,7 @@ bmc_password=${IPMI_PASSWORD:-''}
 function ilo_config() {
     check_compatibility HPE || warn -
     local respecs
+    # TODO: Should we run `ilorest --nologo biosdefaults` first? It would add a lot of pending changes.
     respecs=$(ilorest --nologo list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS. | diff --side-by-side --left-column $HPE_CONF - | awk '{print $NF}' | grep '=' | cut -d '=' -f1 | tr -s '\n' '|' | sed 's/|$//g')
     echo $respecs
     [ -z "$respecs" ] && return 0
@@ -98,18 +102,18 @@ function run_ilo() {
         if [ ilo_verify = "0" ] ; then :
         else
             need_recon+=( "$host_bmc" )
-            ilo_config 2>&1 >$LOG_DIR/${ncn_bmc}.log
         fi
     ilorest --nologo logout 2>&1 >/dev/null
+
     # if running in Jenkins or if -y was given just continue.
     if [[ -n "${CI:-}" ]]; then
-        echo "${#need_recon[@]} of $(($num_bmcs - 1)) need BIOS Baseline applied ... proceeding [CI/automation environment detected]"
+        echo "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceeding [CI/automation environment detected]"
     elif [[ "${BIOS:-'no'}" = 'yes' ]] ; then
-        echo "${#need_recon[@]} of $(($num_bmcs - 1)) need BIOS Baseline applied ... proceeding [-y provided on cmdline]."
+        echo "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceeding [-y provided on cmdline]."
     elif [[ "${CHECK:-'no'}" = 'yes' ]] ; then
         [ "${#need_recon[@]}" = '0' ] && return 0 || die "${#need_recon[@]} of $(($num_bmcs - 1)) need BIOS Baseline applied ... exiting."
     else
-        read -r -p "${#need_recon[@]} of $(($num_bmcs - 1)) need BIOS Baseline applied ... proceed? [Y/n]:" response
+        read -r -p "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceed? [Y/n]:" response
         case "$response" in
             [yY][eE][sS]|[yY])
                 :
