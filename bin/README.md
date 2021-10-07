@@ -15,7 +15,8 @@ This script can run on a non-compute-node or a pre-install-toolkit environment.
 
 > `bios-hpe-baseline.ini`
 
-The main configuration script. Anything in here must match what's in the target.
+The main configuration script. Anything in here must match what's in the target. These settings come
+from: [docs-csm/background/ncn_bios.md](https://github.com/Cray-HPE/docs-csm/blob/59c66b326647eb03f1fe27f2d158260def921068/background/ncn_bios.md).
 
 ## CSI Scripts
 
