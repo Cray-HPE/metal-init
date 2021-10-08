@@ -15,6 +15,7 @@ fi
 mkdir -pv $LOG_DIR
 
 HPE_CONF="$(dirname $0)/$(basename $0 | cut -d '.' -f1 | sed 's/-/-hpe-/g').ini"
+BASELINE=$(cat $HPE_CONF)
 
 # Lay of the Land; rules to abide by for reusable code, and easy identification of problems from new eyeballs.
 # - For anything vendor related, use a common acronym (e.g. GigaByte=gb Hewlett Packard Enterprise=hpe)
@@ -67,15 +68,23 @@ function ilo_config() {
 function ilo_verify() {
     check_compatibility HPE || warn -
     # Without set -e or set -x or set -? this conditional doesn't wait for the return from ilorest --nologo.
-    set -e
-    if [ ! "$(cat $HPE_CONF)" = "$(ilorest --nologo list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS.)" ] ; then
-            echo "differs from spec"
-            return 1
-    else
+    local actual
+    local expected
+    keys=$(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ')
+    actual=$(ilorest --nologo list $keys --selector=BIOS.)
+    if [ ! "${DEBUG:-0}" = 0 ] ; then
+        echo
+        echo $actual
+        echo $BASELINE
+    fi
+    [ -z "$actual" ] && echo >&2 "actual was empty; error reading from ilorest"
+    if [ "$BASELINE" = "$actual" ] ; then
             echo "up-to-spec"
             return 0
+    else
+            echo "differs from spec"
+            return 1
     fi
-    set +e
 }
 
 function run_ilo() {
@@ -99,12 +108,11 @@ function run_ilo() {
     done
     echo "================================"; printf "Checking (self) ${host_bmc} ... "
     ilorest --nologo login -u ${bmc_username} -p ${bmc_password} >/dev/null
-        if [ ilo_verify = "0" ] ; then :
+        if ilo_verify = "0" ; then :
         else
             need_recon+=( "$host_bmc" )
         fi
     ilorest --nologo logout 2>&1 >/dev/null
-
     # if running in Jenkins or if -y was given just continue.
     if [[ -n "${CI:-}" ]]; then
         echo "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceeding [CI/automation environment detected]"
@@ -112,6 +120,9 @@ function run_ilo() {
         echo "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceeding [-y provided on cmdline]."
     elif [[ "${CHECK:-'no'}" = 'yes' ]] ; then
         [ "${#need_recon[@]}" = '0' ] && return 0 || die "${#need_recon[@]} of $(($num_bmcs - 1)) need BIOS Baseline applied ... exiting."
+    elif [ "${#need_recon[@]}" = '0' ] ; then
+        echo 'All NCNs are up-to-spec'
+        return 0
     else
         read -r -p "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceed? [Y/n]:" response
         case "$response" in
