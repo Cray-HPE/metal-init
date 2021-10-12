@@ -5,7 +5,6 @@ trap 'echo See logs for contacted nodes in $LOG_DIR' EXIT INT HUP TERM
 set -u
 set -o pipefail
 
-
 bmc_username=${USERNAME:-$(whoami)}
 if [[ $(hostname) == *-pit ]]; then
     host_bmc="$(hostname | cut -d '-' -f2,3)-mgmt"
@@ -20,33 +19,37 @@ BASELINE=$(cat $HPE_CONF)
 # Lay of the Land; rules to abide by for reusable code, and easy identification of problems from new eyeballs.
 # - For anything vendor related, use a common acronym (e.g. GigaByte=gb Hewlett Packard Enterprise=hpe)
 # - do not add "big" (functions longer than 25 lines, give or take a reasonably, contextually relevant few couple of lines)
-
-
 function check_compatibility() {
-    local vendor=${1:-''}
+    local vendor
+    local target=${1:-}
+    if [ $target = $host_bmc ]; then
+        vendor=$(ipmitool fru | grep -i 'board mfg' | tail -n 1 | cut -d ':' -f2 | tr -d ' ')
+    else
+        vendor=$(ipmitool -I lanplus -U $bmc_username -E -H $target fru | grep -i 'board mfg' | tail -n 1 | cut -d ':' -f2 | tr -d ' ')
+    fi
     case $vendor in
         *GIGABYTE*)
-            echo "No BIOS Baseline for: $vendor" && return 1
+            echo "No BIOS Baseline for (nothing to do): $vendor" && return 1
             ;;
         *Marvell*|HP|HPE)
             :
             ;;
         *'Intel'*'Corporation'*)
-            echo "No BIOS Baseline for: $vendor" && return 1
+            echo "No BIOS Baseline for (nothing to do): $vendor" && return 1
             ;;
         *)
-            echo "Unknown/new/unfamiliar vendor: $vendor" && return 1
+            echo >&2 "Unknown/new/unfamiliar vendor: $vendor" && return 1
             ;;
     esac
 }
 
 # die.. (quit and write a message into standard error).
-function die(){
+function die() {
     [ -n "$1" ] && echo >&2 "$1" && exit 1
 }
 
 # warn.. (print to stderr but do not exit).
-function warn(){
+function warn() {
     [ -n "$1" ] && echo >&2 "$1"
 }
 
@@ -54,8 +57,8 @@ function warn(){
 bmc_password=${IPMI_PASSWORD:-''}
 [ -z "$bmc_password" ] && die 'Need IPMI_PASSWORD exported to the environment.'
 
+# COMPATIBLE VENDOR(S): HPE
 function ilo_config() {
-    check_compatibility HPE || warn -
     local respecs
     # TODO: Should we run `ilorest --nologo biosdefaults` first? It would add a lot of pending changes.
     respecs=$(ilorest --nologo list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS. | diff --side-by-side --left-column $HPE_CONF - | awk '{print $NF}' | grep '=' | cut -d '=' -f1 | tr -s '\n' '|' | sed 's/|$//g')
@@ -65,8 +68,8 @@ function ilo_config() {
     ilorest --nologo pending
 }
 
+# COMPATIBLE VENDOR(S): HPE
 function ilo_verify() {
-    check_compatibility HPE || warn -
     # Without set -e or set -x or set -? this conditional doesn't wait for the return from ilorest --nologo.
     local actual
     local expected
@@ -89,7 +92,6 @@ function ilo_verify() {
 
 function run_ilo() {
     # This only runs on HPE hardware.
-    local vendor='hpe'
     local hosts_file=/etc/dnsmasq.d/statics.conf
     local need_recon=()
     echo "The running host [$host_bmc] will have settings applied last."
@@ -98,21 +100,30 @@ function run_ilo() {
     echo "Verifying $((${num_bmcs})) iLO/BMCs (non-compute nodes) match BIOS baseline spec."
     for ncn_bmc in $(grep -oP 'ncn-\w\d+-mgmt' $hosts_file | sort -u | grep -v $host_bmc); do
         echo "================================"; printf "Checking ${ncn_bmc} ... "
-
-        ilorest --nologo login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
-        if ilo_verify = "0" ; then :
+        if ! check_compatibility $ncn_bmc = 0; then
+            echo "Skipping ... No baseline settings for $ncn_bmc"
         else
-            need_recon+=( "$ncn_bmc" )
+            ilorest --nologo login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
+            # TODO: If we add GB and Intel, then we need more conditionals here or something
+            #       in order to prevent any ilorest activity.
+            if ilo_verify = "0" ; then :
+            else
+                need_recon+=( "$ncn_bmc" )
+            fi
+            ilorest --nologo logout 2>&1 >/dev/null
         fi
-        ilorest --nologo logout 2>&1 >/dev/null
     done
     echo "================================"; printf "Checking (self) ${host_bmc} ... "
-    ilorest --nologo login -u ${bmc_username} -p ${bmc_password} >/dev/null
-        if ilo_verify = "0" ; then :
+        if ! check_compatibility $host_bmc = 0; then
+            echo "Skipping ... No baseline settings for $host_bmc"
         else
-            need_recon+=( "$host_bmc" )
+            ilorest --nologo login -u ${bmc_username} -p ${bmc_password} >/dev/null
+            if ilo_verify = "0" ; then :
+            else
+                need_recon+=( "$host_bmc" )
+            fi
+            ilorest --nologo logout 2>&1 >/dev/null
         fi
-    ilorest --nologo logout 2>&1 >/dev/null
     # if running in Jenkins or if -y was given just continue.
     if [[ -n "${CI:-}" ]]; then
         echo "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceeding [CI/automation environment detected]"
