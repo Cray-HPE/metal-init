@@ -69,13 +69,18 @@ function ilo_config() {
 }
 
 function ilo_enable_ipmitool {
-    ilorest rawpatch enable-dcmi-over-ipmi.json || warn -
+    if ilorest --nologo rawpatch bios-hpe-enable-ipmitool.json  2&>1 >/dev/null; then
+        echo 'ipmitool usage: enabled'
+    else
+        echo 'could not enable DCMI/IPMI; ipmitool may not function!'
+    fi
 }
 
 # COMPATIBLE VENDOR(S): HPE
 function ilo_verify() {
     # Without set -e or set -x or set -? this conditional doesn't wait for the return from ilorest --nologo.
     local actual
+    local error
     local expected
     keys=$(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ')
     actual=$(ilorest --nologo list $keys --selector=BIOS.)
@@ -87,11 +92,13 @@ function ilo_verify() {
     [ -z "$actual" ] && echo >&2 "actual was empty; error reading from ilorest"
     if [ "$BASELINE" = "$actual" ] ; then
             echo "up-to-spec"
-            return 0
+            error=0
     else
             echo "differs from spec"
-            return 1
+            error=1
     fi
+    ilo_enable_ipmitool
+    return $error
 }
 
 function run_ilo() {
