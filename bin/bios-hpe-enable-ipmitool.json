@@ -1,0 +1,9 @@
+{
+  "/redfish/v1/Managers/1/NetworkProtocol/":
+  {
+      "IPMI": {
+            "Port": 623,
+            "ProtocolEnabled": true
+      }
+  }
+}
