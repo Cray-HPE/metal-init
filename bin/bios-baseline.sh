@@ -68,6 +68,10 @@ function ilo_config() {
     ilorest --nologo pending
 }
 
+function ilo_enable_ipmitool {
+    ilorest rawpatch enable-dcmi-over-ipmi.json || warn -
+}
+
 # COMPATIBLE VENDOR(S): HPE
 function ilo_verify() {
     # Without set -e or set -x or set -? this conditional doesn't wait for the return from ilorest --nologo.
