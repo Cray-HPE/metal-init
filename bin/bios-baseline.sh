@@ -14,6 +14,7 @@ fi
 mkdir -pv $LOG_DIR
 
 HPE_CONF="$(dirname $0)/$(basename $0 | cut -d '.' -f1 | sed 's/-/-hpe-/g').ini"
+HPE_IPMI_CONF="$(dirname $0)/bios-hpe-enable-ipmitool.json"
 BASELINE=$(cat $HPE_CONF)
 
 # Lay of the Land; rules to abide by for reusable code, and easy identification of problems from new eyeballs.
@@ -69,7 +70,7 @@ function ilo_config() {
 }
 
 function ilo_enable_ipmitool {
-    if ilorest --nologo rawpatch bios-hpe-enable-ipmitool.json  2&>1 >/dev/null; then
+    if ilorest --nologo rawpatch $HPE_IPMI_CONF 2&>1 >/dev/null; then
         echo 'ipmitool usage: enabled'
     else
         echo 'could not enable DCMI/IPMI; ipmitool may not function!'
