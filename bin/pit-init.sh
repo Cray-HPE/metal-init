@@ -9,7 +9,12 @@ export stoken='ncn-s\w+-mgmt'
 export wtoken='ncn-w\w+-mgmt'
 set +x
 
-/root/bin/metallid.sh
+/root/bin/metalid.sh
+
+function die () {
+    echo >&2 ${1:-'Fatal Error!'}
+    exit 1
+}
 
 export username=${username:-$(whoami)}
 bmc_password=${IPMI_PASSWORD:-''}
@@ -67,7 +72,7 @@ set +e
 wicked ifreload all
 set -e
 
-systemctl restart basecamp conman dnsmasq
-systemctl restart nexus
+echo 'Restarting basecamp conman dnsmasq ... ' && systemctl restart basecamp conman dnsmasq
+echo 'Restarting nexus ... ' && systemctl restart nexus
 
 echo 'Pre-Install Toolkit has been initialized ... '
