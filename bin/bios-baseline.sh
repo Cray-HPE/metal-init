@@ -70,7 +70,7 @@ function ilo_config() {
 }
 
 function ilo_enable_ipmitool {
-    if ilorest --nologo rawpatch $HPE_IPMI_CONF 2&>1 >/dev/null; then
+    if ilorest --nologo rawpatch $HPE_IPMI_CONF > /dev/null 2>&1; then
         echo 'ipmitool usage: enabled'
     else
         echo 'could not enable DCMI/IPMI; ipmitool may not function!'
