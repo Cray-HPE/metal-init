@@ -1,6 +1,6 @@
 #!/bin/bash
 LOG_DIR=/var/log/metal/
-trap 'echo See logs for contacted nodes in $LOG_DIR' EXIT INT HUP TERM
+trap 'echo See logs for reconfigured nodes in $LOG_DIR' EXIT INT HUP TERM
 
 set -u
 set -o pipefail
