@@ -121,7 +121,11 @@ function ilo_verify() {
             echo "differs from spec"
             error=1
     fi
-    ilo_enable_ipmitool
+    if [[ "${CHECK:-'no'}" = 'yes' ]] ; then
+        echo 'called with --check; not enabling ipmitool; ipmitool may not function!'
+    else
+        ilo_enable_ipmitool
+    fi
     return $error
 }
 
