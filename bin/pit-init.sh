@@ -95,6 +95,8 @@ set +e
 wicked ifreload all
 set -e
 
+systemctl enable conman
+
 echo 'Restarting basecamp conman dnsmasq ... ' && systemctl restart basecamp conman dnsmasq
 echo 'Restarting nexus ... ' && systemctl restart nexus
 
