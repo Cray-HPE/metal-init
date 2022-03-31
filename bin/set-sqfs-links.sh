@@ -56,6 +56,14 @@ ceph_initrd="$(find ${WEB_ROOT}/ephemeral/data/ceph -name "*initrd*" -printf '%T
 ceph_kernel="$(find ${WEB_ROOT}/ephemeral/data/ceph -name "*.kernel" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
 ceph_squashfs="$(find ${WEB_ROOT}/ephemeral/data/ceph -name "*.squashfs" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
 
+test -z $k8s_initrd && echo "ERROR: k8s initrd not found in ${WEB_ROOT}/ephemeral/data/k8s" >&2 && exit 1
+test -z $k8s_kernel && echo "ERROR: k8s kernel not found in ${WEB_ROOT}/ephemeral/data/k8s" >&2 && exit 1
+test -z $k8s_squashfs && echo "ERROR: k8s squashfs not found in ${WEB_ROOT}/ephemeral/data/k8s" >&2 && exit 1
+
+test -z $ceph_initrd && echo "ERROR: storage initrd not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
+test -z $ceph_kernel && echo "ERROR: storage kernel not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
+test -z $ceph_squashfs&& echo "ERROR: storage squasfh not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
+
 # RULE! The kernels MUST match; the initrds may be different.
 if [[ "$(basename ${k8s_kernel} | cut -d '-' -f1,2)" != "$(basename ${ceph_kernel} | cut -d '-' -f1,2)" ]]; then
     echo 'Mismatching kernels! The discovered artifacts will deploy an undesirable stack.' >&2
