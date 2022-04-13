@@ -101,11 +101,36 @@ function ilo_enable_ipmitool {
 }
 
 # COMPATIBLE VENDOR(S): HPE
+function ilo_disable_dhcp_shared_nic() {
+    local actual
+    local error
+    local expected='DHCPEnabled=False'
+    actual=$(ilorest --nologo list DHCPv4/DHCPEnabled --selector EthernetInterface --filter Name='Manager Shared Network Interface')
+    if [ $? != 0 ]; then
+        echo >&2 'BMC Shared NIC DHCP: Failed to read!'
+        return 1
+    fi
+    if [[ "$actual" = *"$expected"* ]] ; then
+            echo "BMC Shared NIC DHCP: disabled"
+            error=0
+    else
+            echo >&2 "BMC Shared NIC DHCP: enabled"
+            error=1
+    fi
+    if [ $error = 1 ]; then
+        if ilorest --nologo set DHCPv4/DHCPEnabled=False --selector EthernetInterface --filter Name='Manager Shared Network Interface' --commit; then
+            :
+        else
+            echo >&2 'could not disable DHCP on the shared NIC! Check /var/log/metal/ for detais.'
+        fi 
+    fi
+}
+
+# COMPATIBLE VENDOR(S): HPE
 function ilo_verify() {
     # Without set -e or set -x or set -? this conditional doesn't wait for the return from ilorest --nologo.
     local actual
     local error
-    local expected
     keys=$(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ')
     actual=$(ilorest --nologo list $keys --selector=BIOS.)
     if [ ! "${DEBUG:-0}" = 0 ] ; then
@@ -125,6 +150,7 @@ function ilo_verify() {
         echo 'called with --check; not enabling ipmitool; ipmitool may not function!'
     else
         ilo_enable_ipmitool
+        ilo_disable_dhcp_shared_nic | tee -a $LOG_DIR/${ncn_bmc}-shared-nic.log
     fi
     return $error
 }
