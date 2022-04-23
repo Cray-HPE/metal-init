@@ -91,16 +91,16 @@ if [ ! -d $SITE_INIT ] ; then
 fi
 
 # Resolve CSM_PATH and the yq binary.
-# TODO: MTL-1682 install hpe-csm-yq-package
 yq_error=0
 YQ_BINARY=/usr/bin/yq
-if [ -z ${CSM_PATH} ] ; then
-    error "Can not find CSM tarball providing the yq binary, CSM_PATH is empty!"
-    yq_error=1
-elif [ ! -d ${CSM_PATH} ] ; then
-    error "Can not find CSM_PATH: $CSM_PATH ; no such directory"
-    yq_error=1
-elif [ ! -f ${YQ_BINARY} ] ; then
+if ! command -v $YQ_BINARY >/dev/null ; then
+    if [ -z ${CSM_PATH} ] ; then
+        error "Can not find CSM tarball providing the yq binary, CSM_PATH is empty!"
+        yq_error=1
+    elif [ ! -d ${CSM_PATH} ] ; then
+        error "Can not find CSM_PATH: $CSM_PATH ; no such directory"
+        yq_error=1
+    fi
     YQ_BINARY="${CSM_PATH}/shasta-cfg/utils/bin/$(uname | awk '{print tolower($0)}')/yq"
     if [ ! -f ${YQ_BINARY} ] ; then
         error "Can not find yq binary at $YQ_BINARY"
