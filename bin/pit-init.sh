@@ -36,6 +36,9 @@ set +x
 
 /root/bin/metalid.sh
 
+echo 'Setting up NTP ...'
+/root/bin/configure-ntp.sh
+
 function die () {
     echo >&2 ${1:-'Fatal Error!'}
     exit 1
