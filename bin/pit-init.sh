@@ -36,9 +36,6 @@ set +x
 
 /root/bin/metalid.sh
 
-echo 'Setting up NTP ...'
-/root/bin/configure-ntp.sh
-
 function die () {
     echo >&2 ${1:-'Fatal Error!'}
     exit 1
@@ -122,6 +119,10 @@ echo 'Generating Configuration ...'
     cp -pv $SYSTEM_NAME/conman.conf /etc
     popd
 )
+
+echo 'Setting up NTP ...'
+/root/bin/configure-ntp.sh
+
 if [ $yq_error = 0 ] ; then
     echo 'Merging Generated IPs into customizations.yaml'
     "$YQ_BINARY" merge -xP -i ${SITE_INIT}/customizations.yaml <($YQ_BINARY prefix -P "${PREP_DIR}/${SYSTEM_NAME}/customizations.yaml" spec)
