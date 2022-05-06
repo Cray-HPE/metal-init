@@ -37,6 +37,7 @@ fw=$1
 fw_home=http://pit/fw/river/
 username=${username:-admin}
 password=${password:-password}
+#shellcheck disable=SC2061
 fw_file=$(find $fw_home -name $fw*)
 [ -f $fw_file ] || echo >&2 "Failed to stat $fw_file" && exit 1
 image="$fw_home/$(basename $fw_file)"

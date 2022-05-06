@@ -43,6 +43,7 @@ function die () {
 }
 
 function error() {
+    #shellcheck disable=SC2027
     echo >&2 "ERROR: "${1}""
     ERROR=1
 }
@@ -99,6 +100,7 @@ echo 'Generating Configuration ...'
 (
     pushd $PREP_DIR
     SYSTEM_NAME=$(awk /system-name/'{print $NF}' < system_config.yaml)
+    #shellcheck disable=SC2046
     [ -d $SYSTEM_NAME ] && mv $SYSTEM_NAME $SYSTEM_NAME-$(date '+%Y%m%d%H%M%S')
     csi config init
     cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/

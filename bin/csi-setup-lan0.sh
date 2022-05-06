@@ -44,6 +44,7 @@ sed -i 's/NETCONFIG_DNS_STATIC_SERVERS=.*/NETCONFIG_DNS_STATIC_SERVERS="'"${dns:
 netconfig update -f
 wicked ifdown lan0 && wicked ifup lan0
 systemctl restart wickedd-nanny # Shake out daemon handling of new lan0 name.
+#shellcheck disable=SC2046
 rDNS_FQDN=$(nslookup $addr - $(tail -n 1 /etc/resolv.conf | awk '{print $NF}') | awk '{print $NF}')
 rDNS=$(echo $rDNS_FQDN | cut -d '.' -f1)
 hostnamectl set-hostname ${rDNS}-pit

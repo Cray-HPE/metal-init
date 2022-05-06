@@ -85,9 +85,11 @@ bmc_password=${IPMI_PASSWORD:-''}
 function ilo_config() {
     local respecs
     # TODO: Should we run `ilorest --nologo biosdefaults` first? It would add a lot of pending changes.
+    #shellcheck disable=SC2046
     respecs=$(ilorest --nologo list $(cat $HPE_CONF | cut -d '=' -f1 | tr -s '\n' ' ') --selector=BIOS. | diff --side-by-side --left-column $HPE_CONF - | awk '{print $NF}' | grep '=' | cut -d '=' -f1 | tr -s '\n' '|' | sed 's/|$//g')
     echo $respecs
     [ -z "$respecs" ] && return 0
+    #shellcheck disable=SC2046
     eval ilorest --nologo set $(grep -E "($respecs)" $HPE_CONF | xargs -i echo \"{}\" | tr -s '\n' ' ') --selector=Bios. --commit
     ilorest --nologo pending
 }
@@ -171,10 +173,12 @@ function run_ilo() {
             ilorest --nologo login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
             # TODO: If we add GB and Intel, then we need more conditionals here or something
             #       in order to prevent any ilorest activity.
+            #shellcheck disable=SC2283
             if ilo_verify = "0" ; then :
             else
                 need_recon+=( "$ncn_bmc" )
             fi
+            #shellcheck disable=SC2069
             ilorest --nologo logout 2>&1 >/dev/null
         fi
     done
@@ -183,10 +187,12 @@ function run_ilo() {
             echo "Skipping ... No baseline settings for $host_bmc"
         else
             ilorest --nologo login -u ${bmc_username} -p ${bmc_password} >/dev/null
+            #shellcheck disable=SC2283
             if ilo_verify = "0" ; then :
             else
                 need_recon+=( "$host_bmc" )
             fi
+            #shellcheck disable=SC2069
             ilorest --nologo logout 2>&1 >/dev/null
         fi
     # if running in Jenkins or if -y was given just continue.
@@ -211,6 +217,7 @@ function run_ilo() {
                 ;;
         esac
     fi
+    #shellcheck disable=SC2068
     for ncn_bmc in ${need_recon[@]}; do
         echo "================================"; printf "Configuring ${ncn_bmc} ... "
         if [ $ncn_bmc = $host_bmc ]; then
@@ -220,11 +227,14 @@ function run_ilo() {
             ilorest --nologo login ${ncn_bmc} -u ${bmc_username} -p ${bmc_password} >/dev/null
         fi
 
+        #shellcheck disable=SC2069
         ilo_config 2>&1 >$LOG_DIR/${ncn_bmc}.log
+        #shellcheck disable=SC2069
         ilorest --nologo logout 2>&1 >/dev/null
         echo 'done'
     done
 
+    #shellcheck disable=SC2145
     echo "Settings will apply on the next (re)boot of each NCN: ${need_recon[@]}"
 }
 
