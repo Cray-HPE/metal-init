@@ -34,6 +34,7 @@ export stoken='ncn-s\w+-mgmt'
 export wtoken='ncn-w\w+-mgmt'
 set +x
 
+# Dump release and RPM info for admin/CI visibility.
 /root/bin/metalid.sh
 
 function die () {
@@ -45,20 +46,6 @@ function error() {
     echo >&2 "ERROR: "${1}""
     ERROR=1
 }
-
-export username=${username:-$(whoami)}
-bmc_password=${IPMI_PASSWORD:-''}
-[ -z "$bmc_password" ] && die 'Need IPMI_PASSWORD exported to the environment (optionally, "export username=myuser" as well otherwise $(whoami) is assumed.)'
-
-if [ -z "$SYSTEM_NAME" ] ; then
-    # There is no LAN at this point, so no rDNS can be done to resolve this.
-    echo 'SYSTEM_NAME was not set; resolving automatically ... '
-    # foo-ncn-m001-pit  ---> foo
-    # foo-ncn-m001      ---> foo
-    # ncn-m001          ---> ncn # <-- not ideal, but this won't be used on an NCN
-    # pit               ---> pit # <-- not ideal, but generic enough
-    export SYSTEM_NAME="$(hostname | cut -d '-' -f1)"
-fi
 
 if [ -e /dev/disk/by-label/PITDATA ]; then
     set +e
@@ -111,6 +98,7 @@ fi
 echo 'Generating Configuration ...'
 (
     pushd $PREP_DIR
+    SYSTEM_NAME=$(awk /system-name/'{print $NF}' < system_config.yaml)
     [ -d $SYSTEM_NAME ] && mv $SYSTEM_NAME $SYSTEM_NAME-$(date '+%Y%m%d%H%M%S')
     csi config init
     cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/
