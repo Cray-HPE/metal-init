@@ -42,17 +42,17 @@ mkdir -pv /var/www/ephemeral/data/ceph
 pushd /var/www/ephemeral/data/ceph
 echo Downloading storage-ceph artifacts ...
 wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/storage-ceph/${id}/
-[ ! -f ${id}/storage-ceph*.squashfs ] && echo 2&> Failed to download SquashFS. 
-[ ! -f ${id}/initrd.img.xz ] && echo 2&> Failed to download initrd.img.xz.
-[ ! -f ${id}/*kernel ] && echo 2&> Failed to download the kernel. 
+[ ! -f ${id}/storage-ceph*.squashfs ] && echo >&2 Failed to download SquashFS. 
+[ ! -f ${id}/initrd.img.xz ] && echo >&2 Failed to download initrd.img.xz.
+[ ! -f ${id}/*kernel ] && echo >&2 Failed to download the kernel. 
 ls -l ${id}/ 
 popd
 mkdir -pv /var/www/ephemeral/data/k8s
 pushd /var/www/ephemeral/data/k8s
 echo Downloading kubernetes artifacts ...
 wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/kubernetes/${id}/
-[ ! -f ${id}/kubernetes*.squashfs ] && echo 2&> Failed to download SquashFS. 
-[ ! -f ${id}/initrd.img.xz ] && echo 2&> Failed to download initrd.img.xz.
-[ ! -f ${id}/*kernel ] && echo 2&> Failed to download the kernel.
+[ ! -f ${id}/kubernetes*.squashfs ] && echo >&2 Failed to download SquashFS. 
+[ ! -f ${id}/initrd.img.xz ] && echo >&2 Failed to download initrd.img.xz.
+[ ! -f ${id}/*kernel ] && echo >&2 Failed to download the kernel.
 ls -l ${id}/ 
 popd
