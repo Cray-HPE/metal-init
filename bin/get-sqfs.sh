@@ -39,20 +39,33 @@ if [[ "$id" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
 fi
 
 mkdir -pv /var/www/ephemeral/data/ceph
-pushd /var/www/ephemeral/data/ceph
+pushd /var/www/ephemeral/data/ceph || return
 echo Downloading storage-ceph artifacts ...
 wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/storage-ceph/${id}/
-[ ! -f ${id}/storage-ceph*.squashfs ] && echo >&2 Failed to download SquashFS. 
-[ ! -f ${id}/initrd.img.xz ] && echo >&2 Failed to download initrd.img.xz.
-[ ! -f ${id}/*kernel ] && echo >&2 Failed to download the kernel. 
-ls -l ${id}/ 
-popd
+for file in ${id}/storage-ceph*.squashfs; do
+    [ ! -f $file ] && echo >&2 Failed to download SquashFS.
+done 
+for file in ${id}/initrd.img.xz; do
+    [ ! -f $file ] && echo >&2 Failed to download initrd.img.xz.
+done
+for file in ${id}/*kernel; do
+    [ ! -f $file ] && echo >&2 Failed to download the kernel.
+done 
+ls -l ${id}/
+ 
+popd || exit
 mkdir -pv /var/www/ephemeral/data/k8s
-pushd /var/www/ephemeral/data/k8s
+pushd /var/www/ephemeral/data/k8s || return
 echo Downloading kubernetes artifacts ...
 wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/kubernetes/${id}/
-[ ! -f ${id}/kubernetes*.squashfs ] && echo >&2 Failed to download SquashFS. 
-[ ! -f ${id}/initrd.img.xz ] && echo >&2 Failed to download initrd.img.xz.
-[ ! -f ${id}/*kernel ] && echo >&2 Failed to download the kernel.
+for file in ${id}/kubernetes*.squashfs; do
+    [ ! -f $file ] && echo >&2 Failed to download SquashFS.
+done 
+for file in ${id}/initrd.img.xz; do
+    [ ! -f $file ] && echo >&2 Failed to download initrd.img.xz.
+done
+for file in ${id}/*kernel; do
+    [ ! -f $file ] && echo >&2 Failed to download the kernel.
+done 
 ls -l ${id}/ 
-popd
+popd || exit

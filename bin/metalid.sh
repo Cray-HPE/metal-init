@@ -22,14 +22,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-set -e
+# run to completion even if RPMs are missing
+set +e
 
-#shellcheck disable=SC2283
-echo = PIT Identification = COPY/CUT START =======================================
+echo '= PIT Identification = COPY/CUT START ======================================='
 cat /etc/pit-release
 csi version
-rpm -qa | grep 'metal-'
-rpm -q pit-init
-rpm -qa | grep nexus
-#shellcheck disable=SC2283
-echo = PIT Identification = COPY/CUT END =========================================
+rpm -q ilorest metal-basecamp metal-ipxe metal-net-scripts pit-init pit-nexus
+echo '= PIT Identification = COPY/CUT END ========================================='
