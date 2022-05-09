@@ -1,19 +1,19 @@
 #!/bin/bash
-
+#
 # MIT License
-# 
-# (C) Copyright [2022] Hewlett Packard Enterprise Development LP
-# 
+#
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+#
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
 # to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense,
 # and/or sell copies of the Software, and to permit persons to whom the
 # Software is furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included
 # in all copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -21,7 +21,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-
+#
 set -eu
 set +x
 if [ $# -lt 2 ]; then
@@ -44,7 +44,7 @@ sed -i 's/NETCONFIG_DNS_STATIC_SERVERS=.*/NETCONFIG_DNS_STATIC_SERVERS="'"${dns:
 netconfig update -f
 wicked ifdown lan0 && wicked ifup lan0
 systemctl restart wickedd-nanny # Shake out daemon handling of new lan0 name.
-rDNS_FQDN=$(nslookup $addr - $(tail -n 1 /etc/resolv.conf | awk '{print $NF}') | awk '{print $NF}')
+rDNS_FQDN="$(nslookup $addr - $dns | awk '{print $NF}')"
 rDNS=$(echo $rDNS_FQDN | cut -d '.' -f1)
 hostnamectl set-hostname ${rDNS}-pit
 echo
