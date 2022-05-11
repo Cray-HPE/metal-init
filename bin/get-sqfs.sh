@@ -51,6 +51,9 @@ done
 for file in ${id}/*kernel; do
     [ ! -f $file ] && echo >&2 Failed to download the kernel.
 done 
+if ! wget -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/storage-ceph/${id}/release.txt ; then
+    echo ${id} > ${id}/release.txt
+fi
 ls -l ${id}/
  
 popd || exit
@@ -67,5 +70,9 @@ done
 for file in ${id}/*kernel; do
     [ ! -f $file ] && echo >&2 Failed to download the kernel.
 done 
+if ! wget -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/kubernetes/${id}/release.txt ; then
+    echo ${id} > ${id}/release.txt
+fi
 ls -l ${id}/ 
 popd || exit
+
