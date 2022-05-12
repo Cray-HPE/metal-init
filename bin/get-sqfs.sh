@@ -45,7 +45,7 @@ wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html
 for file in ${id}/storage-ceph*.squashfs; do
     [ ! -f $file ] && echo >&2 Failed to download SquashFS.
 done 
-for file in ${id}/initrd.img.xz; do
+for file in ${id}/initrd.img*; do
     [ ! -f $file ] && echo >&2 Failed to download initrd.img.xz.
 done
 for file in ${id}/*kernel; do
@@ -61,7 +61,7 @@ wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html
 for file in ${id}/kubernetes*.squashfs; do
     [ ! -f $file ] && echo >&2 Failed to download SquashFS.
 done 
-for file in ${id}/initrd.img.xz; do
+for file in ${id}/initrd.img*; do
     [ ! -f $file ] && echo >&2 Failed to download initrd.img.xz.
 done
 for file in ${id}/*kernel; do
