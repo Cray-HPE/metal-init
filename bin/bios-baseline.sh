@@ -206,13 +206,13 @@ function run_ilo() {
         echo 'All NCNs are up-to-spec'
         return 0
     else
-        read -r -p "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceed? [Y/n]:" response
+        read -r -p "${#need_recon[@]} of $num_bmcs need BIOS Baseline applied ... proceed? [y/N]:" response
         case "$response" in
             [yY][eE][sS]|[yY])
                 :
                 ;;
             *)
-                echo 'exiting ...'
+                echo 'exiting without applying BIOS Baselines...'
                 return 0
                 ;;
         esac
