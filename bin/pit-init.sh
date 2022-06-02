@@ -26,16 +26,7 @@
 set -e
 ERROR=0
 
-echo 'Initializing the Pre-Install Toolkit'
-echo 'Exporting tokens'
-set -x
-export mtoken='ncn-m(?!001)\w+-mgmt'
-export stoken='ncn-s\w+-mgmt'
-export wtoken='ncn-w\w+-mgmt'
-set +x
-
-# Dump release and RPM info for admin/CI visibility.
-/root/bin/metalid.sh
+export PITDATA="${PITDATA:-}"
 
 function die () {
     echo >&2 ${1:-'Fatal Error!'}
@@ -47,94 +38,156 @@ function error() {
     ERROR=1
 }
 
-if [ -e /dev/disk/by-label/PITDATA ]; then
+function init {
+
+    echo 'Exporting tokens'
+    set -x
+    export mtoken='ncn-m(?!001)\w+-mgmt'
+    export stoken='ncn-s\w+-mgmt'
+    export wtoken='ncn-w\w+-mgmt'
+    set +x
+
+    # Dump release and RPM info for admin/CI visibility.
+    /root/bin/metalid.sh
+
+    if [ -e /dev/disk/by-label/PITDATA ]; then
+        set +e
+        mount -a -v
+        set -e
+        PIT_DATA="$(lsblk -o MOUNTPOINT -nr /dev/disk/by-label/PITDATA)"
+    else
+        # PITDATA needs to exist before this script is called, because pit-init relies on items existing
+        # within pitdata prior to running it.
+        error "No DISK exists for PITDATA"
+    fi
+
+    export PREP_DIR=${PIT_DATA}/prep
+    if [ ! -d "$PREP_DIR" ]; then 
+        error "$PREP_DIR does not exist! This needs to be created and populated with CSI input files before re-running this script"
+    fi
+    export DATA_DIR=${PIT_DATA}/data
+    export CONF_DIR=${PIT_DATA}/configs
+
+    # Create our base directories if they do not already exist.
+    if [ ! -d $DATA_DIR ]; then
+        mkdir -pv $DATA_DIR
+    fi
+    if [ ! -d $CONF_DIR ]; then
+        mkdir -pv $CONF_DIR
+    fi
+}
+
+function load_csi {
+
+    local csi_conf=${PREP_DIR}/system_config.yaml
+
+    if [ ! -f $csi_conf ] ; then
+        # TODO: MTL-1695 Update this to point to the new example system_config.yaml file.
+        error 'CSI needs inputs; no $csi_conf file detected!'
+        die 'See: https://github.com/Cray-HPE/docs-csm/blob/main/install/prepare_configuration_payload.md'
+    fi
+
+    echo 'Generating Configuration ...'
+    (
+        pushd $PREP_DIR
+        SYSTEM_NAME=$(awk /system-name/'{print $NF}' < system_config.yaml)
+        [ -d $SYSTEM_NAME ] && mv $SYSTEM_NAME $SYSTEM_NAME-"$(date '+%Y%m%d%H%M%S')"
+        csi config init
+        cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/
+        cp -pv $SYSTEM_NAME/dnsmasq.d/* /etc/dnsmasq.d/
+        cp -pv $SYSTEM_NAME/basecamp/data.json /var/www/ephemeral/configs/
+        cp -pv $SYSTEM_NAME/conman.conf /etc
+        popd
+    )
+}
+
+function load_ntp {
+    echo 'Setting up NTP ...'
+    if /root/bin/configure-ntp.sh; then
+        echo 'NTP has been configured'
+    else
+        error 'Failed to setup NTP'
+    fi
+}
+
+function load_site_init {
+    site_init=${PREP_DIR}/site-init
+    local site_init_error=0
+    local yq_error=0
+    local yq_binary=/usr/bin/yq
+
+    # Resolve CSM_PATH and the yq binary.
+    if ! command -v $yq_binary >/dev/null ; then
+        if [ -z ${CSM_PATH} ] ; then
+            error "Can not find CSM tarball providing the yq binary, CSM_PATH is empty!"
+            yq_error=1
+        elif [ ! -d ${CSM_PATH} ] ; then
+            error "Can not find CSM_PATH: $CSM_PATH ; no such directory"
+            yq_error=1
+        fi
+        yq_binary="${CSM_PATH}/shasta-cfg/utils/bin/$(uname | awk '{print tolower($0)}')/yq"
+        if [ ! -f ${yq_binary} ] ; then
+            error "Can not find yq binary at $yq_binary"
+            yq_error=1
+        fi
+    fi
+
+    # Resolve site_init.
+    if [ ! -d $site_init ] ; then
+        error "Need $site_init; this needs to be created. Create this before re-running $0!"
+        error "See: https://github.com/Cray-HPE/docs-csm/blob/main/install/prepare_site_init.md#create-and-initialize-site-init-directory"
+        return 1
+    fi
+
+    # YQ Merge CSI Customizations.yaml into site-inits; merge the CA cert data.
+    if [ $yq_error = 0 ] ; then
+        echo 'Merging Generated IPs into customizations.yaml'
+        "$yq_binary" merge -xP -i ${site_init}/customizations.yaml <($yq_binary prefix -P "${PREP_DIR}/${SYSTEM_NAME}/customizations.yaml" spec)
+    else
+        error 'yq is not available for merging generated IPs into customizations.yaml!'
+    fi 
+
+    if [ $site_init_error = 0 ] ; then
+        echo 'Patching CA into data.json (cloud-init)'
+        csi patch ca --cloud-init-seed-file ${CONF_DIR}/data.json --customizations-file ${site_init}/customizations.yaml --sealed-secret-key-file ${site_init}/certs/sealed_secrets.key
+        echo 'Restarting basecamp to pickup new data.json ... '
+        systemctl restart basecamp
+    else
+        error "site-init does not exist at the expected location: $site_init"
+    fi
+}
+
+function reload_interfaces {
+    echo 'Loading sysconfig (ifcfg files) ... '
+    echo 'WARNING: SSH may disconnect if it was already setup'
     set +e
-    mount -v -L PITDATA
+    # wicked will return exit codes if no-device is found, despite the interface actually working it can return a non-zero exit
+    # for example if a vlan is loaded before the bond, it will (for a moment) indicate a failure.
+    # This command will always work unless CSI generates ifcfg files incorrectly, in which case we need to fix/bug CSI.
+    # In those events, a `systemctl restart wickedd-nanny` is required, as well as a `systemctl restart wicked`, but only
+    # after the configuration has been corrected.
+    wicked ifreload all
     set -e
-fi
+}
 
-# Create our base directories if they do not already exist.
-PIT_DATA=/var/www/ephemeral
-PREP_DIR=${PIT_DATA}/prep
-DATA_DIR=${PIT_DATA}/data
-CONF_DIR=${PIT_DATA}/configs
-CSI_CONF=${PREP_DIR}/system_config.yaml
-SITE_INIT=${PREP_DIR}/site-init
-[ ! -d $PREP_DIR ] && mkdir -pv $PREP_DIR
-[ ! -d $DATA_DIR ] && mkdir -pv $DATA_DIR
-[ ! -d $CONF_DIR ] && mkdir -pv $CONF_DIR
-if [ ! -f $CSI_CONF ] ; then
-    # TODO: MTL-1695 Update this to point to the new example system_config.yaml file.
-    error 'CSI needs inputs; no $CSI_CONF file detected!'
-    die 'See: https://github.com/Cray-HPE/docs-csm/blob/main/install/prepare_configuration_payload.md'
-fi
+function load_and_start_systemd {
+    # nexus takes longer to start, this ensures we fail-quickly on basecamp, conman, or dnsmasq if nexus is started by itself.
+    systemctl enable basecamp conman dnsmasq nexus
+    echo 'Restarting basecamp conman dnsmasq ... ' && systemctl restart basecamp conman dnsmasq
+    echo 'Restarting nexus ... ' && systemctl restart nexus
+}
 
-# Resolve SITE_INIT.
-site_init_error=0
-if [ ! -d $SITE_INIT ] ; then
-    error "Need $SITE_INIT; this needs to be created before invoking $0!"
-    error "See: https://github.com/Cray-HPE/docs-csm/blob/main/install/prepare_site_init.md#create-and-initialize-site-init-directory"
-    site_init_error=1
-fi
+function main {
+    load_csi
+    reload_interfaces
+    load_and_start_systemd
+    load_ntp
+    load_site_init
+}
 
-# Resolve CSM_PATH and the yq binary.
-yq_error=0
-YQ_BINARY=/usr/bin/yq
-if ! command -v $YQ_BINARY >/dev/null ; then
-    if [ -z ${CSM_PATH} ] ; then
-        error "Can not find CSM tarball providing the yq binary, CSM_PATH is empty!"
-        yq_error=1
-    elif [ ! -d ${CSM_PATH} ] ; then
-        error "Can not find CSM_PATH: $CSM_PATH ; no such directory"
-        yq_error=1
-    fi
-    YQ_BINARY="${CSM_PATH}/shasta-cfg/utils/bin/$(uname | awk '{print tolower($0)}')/yq"
-    if [ ! -f ${YQ_BINARY} ] ; then
-        error "Can not find yq binary at $YQ_BINARY"
-        yq_error=1
-    fi
-fi
-
-echo 'Generating Configuration ...'
-(
-    pushd $PREP_DIR
-    SYSTEM_NAME=$(awk /system-name/'{print $NF}' < system_config.yaml)
-    [ -d $SYSTEM_NAME ] && mv $SYSTEM_NAME $SYSTEM_NAME-"$(date '+%Y%m%d%H%M%S')"
-    csi config init
-    cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/
-    cp -pv $SYSTEM_NAME/dnsmasq.d/* /etc/dnsmasq.d/
-    cp -pv $SYSTEM_NAME/basecamp/data.json /var/www/ephemeral/configs/
-    cp -pv $SYSTEM_NAME/conman.conf /etc
-    popd
-)
-
-echo 'Setting up NTP ...'
-/root/bin/configure-ntp.sh
-
-if [ $yq_error = 0 ] ; then
-    echo 'Merging Generated IPs into customizations.yaml'
-    "$YQ_BINARY" merge -xP -i ${SITE_INIT}/customizations.yaml <($YQ_BINARY prefix -P "${PREP_DIR}/${SYSTEM_NAME}/customizations.yaml" spec)
-else
-    error 'yq is not available for merging generated IPs into customizations.yaml!'
-fi 
-if [ $site_init_error = 0 ] ; then
-    echo 'Patching CA into data.json (cloud-init)'
-    csi patch ca --cloud-init-seed-file ${CONF_DIR}/data.json --customizations-file ${SITE_INIT}/customizations.yaml --sealed-secret-key-file ${SITE_INIT}/certs/sealed_secrets.key
-else
-    error "site-init does not exist at the expected location: $SITE_INIT"
-fi
-
-echo 'Loading sysconfig (ifcfg files) ... '
-echo 'WARNING: SSH may disconnect if it was already setup'
-set +e
-wicked ifreload all
-set -e
-
-# nexus takes longer to start, this ensures we fail-quickly on basecamp, conman, or dnsmasq if nexus is started by itself.
-systemctl enable basecamp conman dnsmasq nexus
-echo 'Restarting basecamp conman dnsmasq ... ' && systemctl restart basecamp conman dnsmasq
-echo 'Restarting nexus ... ' && systemctl restart nexus
-
+echo 'Initializing the Pre-Install Toolkit'
+init
+main
 if [ $ERROR = 0 ]; then
     echo 'Pre-Install Toolkit has been initialized ...'
 else
