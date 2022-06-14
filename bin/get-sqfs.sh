@@ -33,6 +33,11 @@ if [ -z $id ]; then
     exit 1
 fi
 
+if [ -z "${ARTIFACTORY_USER}" ] || [ -z "${ARTIFACTORY_TOKEN} "]; then
+    echo >&2 "ARTIFACTORY_USER and ARTIFACTORY_TOKEN must be defined for accessing csm-images in artifactory.algol60.net. One or both were empty/undefined."
+    exit 1
+fi
+
 stream=unstable
 if [[ "$id" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
     stream=stable
@@ -41,7 +46,7 @@ fi
 mkdir -pv /var/www/ephemeral/data/ceph
 pushd /var/www/ephemeral/data/ceph || return
 echo Downloading storage-ceph artifacts ...
-wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/storage-ceph/${id}/
+wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://$ARTIFACTORY_USER:$ARTIFACTORY_TOKEN@artifactory.algol60.net/artifactory/csm-images/${stream}/storage-ceph/${id}/
 for file in ${id}/storage-ceph*.squashfs; do
     [ ! -f $file ] && echo >&2 Failed to download SquashFS.
 done 
@@ -57,7 +62,7 @@ popd || exit
 mkdir -pv /var/www/ephemeral/data/k8s
 pushd /var/www/ephemeral/data/k8s || return
 echo Downloading kubernetes artifacts ...
-wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://artifactory.algol60.net/artifactory/csm-images/${stream}/kubernetes/${id}/
+wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://$ARTIFACTORY_USER:$ARTIFACTORY_TOKEN@artifactory.algol60.net/artifactory/csm-images/${stream}/kubernetes/${id}/
 for file in ${id}/kubernetes*.squashfs; do
     [ ! -f $file ] && echo >&2 Failed to download SquashFS.
 done 
