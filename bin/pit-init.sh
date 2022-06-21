@@ -26,7 +26,10 @@
 set -e
 ERROR=0
 
+# These may already be set in the environment if pit-init is being invoked during
+# a fresh install. If they are, then set them to their current value.
 export PITDATA="${PITDATA:-}"
+export SYSTEM_NAME="${SYSTEM_NAME:-}"
 
 function die () {
     echo >&2 ${1:-'Fatal Error!'}
@@ -88,17 +91,17 @@ function load_csi {
     fi
 
     echo 'Generating Configuration ...'
-    (
-        pushd $PREP_DIR
+    pushd $PREP_DIR
+    if [ -z "$SYSTEM_NAME" ]; then
         SYSTEM_NAME=$(awk /system-name/'{print $NF}' < system_config.yaml)
-        [ -d $SYSTEM_NAME ] && mv $SYSTEM_NAME $SYSTEM_NAME-"$(date '+%Y%m%d%H%M%S')"
-        csi config init
-        cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/
-        cp -pv $SYSTEM_NAME/dnsmasq.d/* /etc/dnsmasq.d/
-        cp -pv $SYSTEM_NAME/basecamp/data.json /var/www/ephemeral/configs/
-        cp -pv $SYSTEM_NAME/conman.conf /etc
-        popd
-    )
+    fi
+    [ -d $SYSTEM_NAME ] && mv $SYSTEM_NAME $SYSTEM_NAME-"$(date '+%Y%m%d%H%M%S')"
+    csi config init
+    cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/
+    cp -pv $SYSTEM_NAME/dnsmasq.d/* /etc/dnsmasq.d/
+    cp -pv $SYSTEM_NAME/basecamp/data.json /var/www/ephemeral/configs/
+    cp -pv $SYSTEM_NAME/conman.conf /etc
+    popd
 }
 
 function load_ntp {
@@ -115,6 +118,11 @@ function load_site_init {
     local site_init_error=0
     local yq_error=0
     local yq_binary=/usr/bin/yq
+
+    if [ -z "$SYSTEM_NAME" ]; then
+        echo >&2 "SYSTEM_NAME was not set, this is required to resolve auto-generated customizations from 'csi config init'"
+        return 1
+    fi
 
     # Resolve CSM_PATH and the yq binary.
     if ! command -v $yq_binary >/dev/null ; then
