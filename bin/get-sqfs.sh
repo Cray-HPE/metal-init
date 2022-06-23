@@ -33,7 +33,7 @@ if [ -z $id ]; then
     exit 1
 fi
 
-if [ -z "${ARTIFACTORY_USER}" ] || [ -z "${ARTIFACTORY_TOKEN} "]; then
+if [ -z "${ARTIFACTORY_USER}" ] || [ -z "${ARTIFACTORY_TOKEN}" ]; then
     echo >&2 "ARTIFACTORY_USER and ARTIFACTORY_TOKEN must be defined for accessing csm-images in artifactory.algol60.net. One or both were empty/undefined."
     exit 1
 fi
