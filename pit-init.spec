@@ -27,8 +27,8 @@ BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}
 License: HPE Proprietary
 Summary: The pre-install toolkit scripts provided on the CRAY LiveCD
-Version: %(cat .version)
-Release: %(echo ${BUILD_METADATA})
+Version: %(echo $VERSION)
+Release: 1
 Source: %{name}-%{version}.tar.bz2
 Vendor: Hewlett Packard Enterprise Development LP
 Requires: ilorest
