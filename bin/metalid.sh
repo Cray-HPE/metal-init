@@ -25,8 +25,10 @@
 # run to completion even if RPMs are missing
 set +e
 
+# Do not include CSI, csi version is invoked to give more specific version information that RPMs do not give.
+RPMS=( "canu" "ilorest" "metal-basecamp" "metal-ipxe" "metal-net-scripts" "pit-init" "pit-nexus" )
 echo '= PIT Identification = COPY/CUT START ======================================='
 cat /etc/pit-release
 csi version
-rpm -q ilorest metal-basecamp metal-ipxe metal-net-scripts pit-init pit-nexus
+rpm -q "${RPMS[@]}"
 echo '= PIT Identification = COPY/CUT END ========================================='
