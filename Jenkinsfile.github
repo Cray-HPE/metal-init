@@ -1,7 +1,7 @@
 @Library('csm-shared-library') _
 
 def sleVersion = '15.3'
-def isStable = env.TAG_NAME != null || env.BRANCH_NAME == 'main' ? true : false
+def isStable = env.TAG_NAME != null ? true : false
 pipeline {
   agent {
     label "metal-gcp-builder"
