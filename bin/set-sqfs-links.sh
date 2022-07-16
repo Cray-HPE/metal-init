@@ -73,6 +73,15 @@ call_bmc || echo no BMC password set, using existing dnsmasq.leases
 
 echo "$0 is creating boot directories for each NCN with a BMC that has a lease in /var/lib/misc/dnsmasq.leases"
 echo "Nodes without boot directories will still boot the non-destructive iPXE binary."
+
+if [ -n "${CSM_RELEASE:-}" ]; then
+    sed -i -E 's/live-sqfs-opts root/live-sqfs-opts rd.live.dir='"$CSM_RELEASE"' root/g' /var/www/boot/script.ipxe
+    echo -e "\tImages will be stored on the NCN at /run/initramfs/live/$CSM_RELEASE/"
+else
+    echo -e >&2 "\tWARNING: CSM_RELEASE was not set, images will be stored in their default location on the node(s) at /run/initramfs/live/LiveOS/"
+fi
+
+
 #shellcheck disable=SC2013
 for ncn in $(grep -Eo 'ncn-[mw]\w+' /var/lib/misc/dnsmasq.leases | sort -u); do
     mkdir -pv ${ncn} && pushd ${ncn}
