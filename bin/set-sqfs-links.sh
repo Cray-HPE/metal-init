@@ -94,14 +94,14 @@ echo -e "\tNOTE: Nodes without boot directories will still boot the non-destruct
 
 if [ -n "${CSM_RELEASE:-}" ]; then
     if grep -q rd.live.dir /var/www/boot/script.ipxe; then
-        sed -i -E 's/rd.live.dir=.* /rd.live.dir='"$CSM_RELEASE"' /g' /var/www/boot/script.ipxe
+        sed -i -E 's/rd.live.dir=.* root/rd.live.dir='"$CSM_RELEASE"' root/g' /var/www/boot/script.ipxe
     else
         sed -i -E 's/live-sqfs-opts root/live-sqfs-opts rd.live.dir='"$CSM_RELEASE"' root/g' /var/www/boot/script.ipxe
     fi
     echo -e "\tImages will be stored on the NCN at /run/initramfs/live/$CSM_RELEASE/"
 else
     if grep -q rd.live.dir /var/www/boot/script.ipxe; then
-        sed -i -E 's/rd.live.dir=.* //g' /var/www/boot/script.ipxe
+        sed -i -E 's/rd.live.dir=.* root/root/g' /var/www/boot/script.ipxe
     fi
     echo -e >&2 "\tWARNING: CSM_RELEASE was not set, images will be stored in their default location on the node(s) at /run/initramfs/live/LiveOS/"
 fi
