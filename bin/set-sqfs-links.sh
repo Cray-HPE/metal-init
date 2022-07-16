@@ -100,6 +100,9 @@ if [ -n "${CSM_RELEASE:-}" ]; then
     fi
     echo -e "\tImages will be stored on the NCN at /run/initramfs/live/$CSM_RELEASE/"
 else
+    if grep -q rd.live.dir /var/www/boot/script.ipxe; then
+        sed -i -E 's/rd.live.dir=.* //g' /var/www/boot/script.ipxe
+    fi
     echo -e >&2 "\tWARNING: CSM_RELEASE was not set, images will be stored in their default location on the node(s) at /run/initramfs/live/LiveOS/"
 fi
 
