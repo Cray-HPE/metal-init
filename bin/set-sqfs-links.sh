@@ -93,7 +93,11 @@ echo "$0 is creating boot directories for each NCN with a BMC that has a lease i
 echo -e "\tNOTE: Nodes without boot directories will still boot the non-destructive iPXE binary for bare-metal discovery usage."
 
 if [ -n "${CSM_RELEASE:-}" ]; then
-    sed -i -E 's/live-sqfs-opts root/live-sqfs-opts rd.live.dir='"$CSM_RELEASE"' root/g' /var/www/boot/script.ipxe
+    if grep -q rd.live.dir /var/www/boot/script.ipxe; then
+        sed -i -E 's/rd.live.dir=.* /rd.live.dir='"$CSM_RELEASE"' /g' /var/www/boot/script.ipxe
+    else
+        sed -i -E 's/live-sqfs-opts root/live-sqfs-opts rd.live.dir='"$CSM_RELEASE"' root/g' /var/www/boot/script.ipxe
+    fi
     echo -e "\tImages will be stored on the NCN at /run/initramfs/live/$CSM_RELEASE/"
 else
     echo -e >&2 "\tWARNING: CSM_RELEASE was not set, images will be stored in their default location on the node(s) at /run/initramfs/live/LiveOS/"
