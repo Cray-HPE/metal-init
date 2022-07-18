@@ -24,31 +24,45 @@
 
 #shellcheck disable=SC2086
 
-set -eu
+set -euo pipefail
 
 WEB_ROOT=/var/www
 
 function call_bmc {
+    local actual_bmcs=0
+    local expected_bmcs=0
     local vendor
     local channel=1 # GB & HPE
 
+    expected_bmcs="$(grep -P 'host-record=ncn-\w\d+-mgmt' /etc/dnsmasq.d/statics.conf | grep -v m001 | wc -l)"
     vendor="$(ipmitool fru | awk '/Board Mfg/ && !/Date/ {print $4}')"
     if [[ "$vendor" = *Intel* ]]; then
         channel=3
     fi
 
     [ -z "$IPMI_PASSWORD" ] && echo >&2 'Need IPMI_PASSWORD set in env (export IPMI_PASSWORD=password).' && return 1
-    echo 'Attempting to set all known BMCs (from /etc/conman.conf) to dhcp mode'
+    echo 'Attempting to set all known BMCs (from /etc/conman.conf) to DHCP mode'
     echo "current BMC count: $(grep -c mgmt /var/lib/misc/dnsmasq.leases)"
     (
     export username=root
     export IPMI_PASSWORD=$IPMI_PASSWORD
     grep mgmt /etc/conman.conf | grep -v m001 | awk '{print $3}' | cut -d ':' -f2 | tr -d \" | xargs -t -i ipmitool -I lanplus -U $username -E -H {} lan set $channel ipsrc dhcp
     ) >/var/log/metal-bmc-restore.$$.out 2>&1
-    sleep 2 && echo "new BMC count: $(grep -c mgmt /var/lib/misc/dnsmasq.leases)"
+    function _actual_bmcs {
+        grep -c mgmt /var/lib/misc/dnsmasq.leases
+    }
+    actual_bmcs="$(_actual_bmcs)"
+    while [ ! "$actual_bmcs" -eq "$expected_bmcs" ] ; do
+        echo "Waiting on $expected_bmcs to request DHCP ... "
+        actual_bmcs="$(_actual_bmcs)"
+        echo -ne "Current: $actual_bmcs\033[0K\r"
+        sleep 1
+    done
+    echo "All [$expected_bmcs] expected BMCs have requested DHCP."
 }
 
 # Finds latest of each artifact regardless of subdirectory.
+echo "Resolving images to boot ... "
 k8s_initrd="$(find ${WEB_ROOT}/ephemeral/data/k8s -name "*initrd*" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
 k8s_kernel="$(find ${WEB_ROOT}/ephemeral/data/k8s -name "*.kernel" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
 k8s_squashfs="$(find ${WEB_ROOT}/ephemeral/data/k8s -name "*.squashfs" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
@@ -63,6 +77,9 @@ test -z $k8s_squashfs && echo "ERROR: k8s squashfs not found in ${WEB_ROOT}/ephe
 test -z $ceph_initrd && echo "ERROR: storage initrd not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
 test -z $ceph_kernel && echo "ERROR: storage kernel not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
 test -z $ceph_squashfs&& echo "ERROR: storage squasfh not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
+echo 'Images resolved'
+echo -e "Kubernetes Boot Selection:\n\tkernel: $k8s_kernel\n\tinitrd: $k8s_initrd\n\tsquash: $k8s_squashfs"
+echo -e "Storage Boot Selection:\n\tkernel: $ceph_kernel\n\tinitrd: $ceph_initrd\n\tsquash: $ceph_squashfs"
 
 # RULE! The kernels MUST match; the initrds may be different.
 if [[ "$(basename ${k8s_kernel} | cut -d '-' -f1,2)" != "$(basename ${ceph_kernel} | cut -d '-' -f1,2)" ]]; then
@@ -72,31 +89,55 @@ fi
 call_bmc || echo no BMC password set, using existing dnsmasq.leases
 
 echo "$0 is creating boot directories for each NCN with a BMC that has a lease in /var/lib/misc/dnsmasq.leases"
-echo "Nodes without boot directories will still boot the non-destructive iPXE binary."
-#shellcheck disable=SC2013
-for ncn in $(grep -Eo 'ncn-[mw]\w+' /var/lib/misc/dnsmasq.leases | sort -u); do
-    mkdir -pv ${ncn} && pushd ${ncn}
-    cp -pv /var/www/boot/script.ipxe .
+
+echo -e "\tNOTE: Nodes without boot directories will still boot the non-destructive iPXE binary for bare-metal discovery usage."
+
+if [ -n "${CSM_RELEASE:-}" ]; then
+    if grep -q rd.live.dir /var/www/boot/script.ipxe; then
+        sed -i -E 's/rd.live.dir=.* root/rd.live.dir='"$CSM_RELEASE"' root/g' /var/www/boot/script.ipxe
+    else
+        sed -i -E 's/live-sqfs-opts root/live-sqfs-opts rd.live.dir='"$CSM_RELEASE"' root/g' /var/www/boot/script.ipxe
+    fi
+    echo -e "\tImages will be stored on the NCN at /run/initramfs/live/$CSM_RELEASE/"
+else
+    if grep -q rd.live.dir /var/www/boot/script.ipxe; then
+        sed -i -E 's/rd.live.dir=.* root/root/g' /var/www/boot/script.ipxe
+    fi
+    echo -e >&2 "\tWARNING: CSM_RELEASE was not set, images will be stored in their default location on the node(s) at /run/initramfs/live/LiveOS/"
+fi
+
+readarray -t NCNS_K8S < <(grep -Eo 'ncn-[mw]\w+' /var/lib/misc/dnsmasq.leases | sort -u)
+if [ "${#NCNS_K8S[@]}" = 0 ]; then
+    echo >&2 'No kubernetes NCN BMCs found in /var/lib/misc/dnsmasq.leases'
+    exit 1
+fi
+for ncn in "${NCNS_K8S[@]}"; do
+    mkdir -p ${ncn} && pushd ${ncn} >/dev/null
+    cp -p /var/www/boot/script.ipxe .
     if [[ "$ncn" =~ 'ncn-w' ]]; then
         sed -i -E 's/rd.luks(=1)?\s/rd.luks=0 /g' script.ipxe
     fi
-    ln -vsnf ..${k8s_kernel///var\/www} kernel
-    ln -vsnf ..${k8s_initrd///var\/www} initrd.img.xz
-    ln -vsnf ..${k8s_squashfs///var\/www} filesystem.squashfs
-    popd
+    ln -snf ..${k8s_kernel///var\/www} kernel
+    ln -snf ..${k8s_initrd///var\/www} initrd.img.xz
+    ln -snf ..${k8s_squashfs///var\/www} filesystem.squashfs
+    popd >/dev/null
 done
-#shellcheck disable=SC2013
-for ncn in $(grep -Eo 'ncn-s\w+' /var/lib/misc/dnsmasq.leases | sort -u); do
-    mkdir -pv ${ncn} && pushd ${ncn}
-    cp -pv /var/www/boot/script.ipxe .
-    ln -vsnf ..${ceph_kernel///var\/www} kernel
-    ln -vsnf ..${ceph_initrd///var\/www} initrd.img.xz
-    ln -vsnf ..${ceph_squashfs///var\/www} filesystem.squashfs
-    popd
+readarray -t NCNS_CEPH < <(grep -Eo 'ncn-s\w+' /var/lib/misc/dnsmasq.leases | sort -u)
+if [ "${#NCNS_CEPH[@]}" = 0 ]; then
+    echo >&2 'No storage NCN BMCs found in /var/lib/misc/dnsmasq.leases'
+    exit 1
+fi
+for ncn in "${NCNS_CEPH[@]}"; do
+    mkdir -p ${ncn} && pushd ${ncn} >/dev/null
+    cp -p /var/www/boot/script.ipxe .
+    ln -snf ..${ceph_kernel///var\/www} kernel
+    ln -snf ..${ceph_initrd///var\/www} initrd.img.xz
+    ln -snf ..${ceph_squashfs///var\/www} filesystem.squashfs
+    popd >/dev/null
 done
 
 if ! [ "$(pwd)" = $WEB_ROOT ]; then
-    rsync -rltDvq --remove-source-files ncn-* $WEB_ROOT 2>/dev/null && rmdir ncn-* || echo >&2 'FATAL: No NCN BMCs found in /var/lib/misc/dnsmasq.leases'
+    rsync -rltDvq --remove-source-files ncn-* $WEB_ROOT 2>/dev/null && rmdir ncn-*
 fi
 
-echo 'done'
+echo '/var/www is ready.'
