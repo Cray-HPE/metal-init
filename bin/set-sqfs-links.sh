@@ -52,8 +52,8 @@ function call_bmc {
         grep -c mgmt /var/lib/misc/dnsmasq.leases
     }
     actual_bmcs="$(_actual_bmcs)"
+    echo "Waiting on $expected_bmcs to request DHCP ... "
     while [ ! "$actual_bmcs" -eq "$expected_bmcs" ] ; do
-        echo "Waiting on $expected_bmcs to request DHCP ... "
         actual_bmcs="$(_actual_bmcs)"
         echo -ne "Current: $actual_bmcs\033[0K\r"
         sleep 1
