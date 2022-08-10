@@ -46,7 +46,7 @@ fi
 mkdir -pv /var/www/ephemeral/data/ceph
 pushd /var/www/ephemeral/data/ceph || return
 echo Downloading storage-ceph artifacts ...
-wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://$ARTIFACTORY_USER:$ARTIFACTORY_TOKEN@artifactory.algol60.net/artifactory/csm-images/${stream}/storage-ceph/${id}/
+wget --progress=bar:force:noscroll -q --show-progress --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off https://$ARTIFACTORY_USER:$ARTIFACTORY_TOKEN@artifactory.algol60.net/artifactory/csm-images/${stream}/storage-ceph/${id}/
 for file in ${id}/storage-ceph*.squashfs; do
     [ ! -f $file ] && echo >&2 Failed to download SquashFS.
 done 
@@ -62,7 +62,7 @@ popd || exit
 mkdir -pv /var/www/ephemeral/data/k8s
 pushd /var/www/ephemeral/data/k8s || return
 echo Downloading kubernetes artifacts ...
-wget --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off -nv https://$ARTIFACTORY_USER:$ARTIFACTORY_TOKEN@artifactory.algol60.net/artifactory/csm-images/${stream}/kubernetes/${id}/
+wget --progress=bar:force:noscroll -q --show-progress --mirror -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs -R index.html* -e robots=off https://$ARTIFACTORY_USER:$ARTIFACTORY_TOKEN@artifactory.algol60.net/artifactory/csm-images/${stream}/kubernetes/${id}/
 for file in ${id}/kubernetes*.squashfs; do
     [ ! -f $file ] && echo >&2 Failed to download SquashFS.
 done 
