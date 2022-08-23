@@ -76,7 +76,7 @@ test -z $k8s_squashfs && echo "ERROR: k8s squashfs not found in ${WEB_ROOT}/ephe
 
 test -z $ceph_initrd && echo "ERROR: storage initrd not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
 test -z $ceph_kernel && echo "ERROR: storage kernel not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
-test -z $ceph_squashfs&& echo "ERROR: storage squasfh not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
+test -z $ceph_squashfs && echo "ERROR: storage squasfh not found in ${WEB_ROOT}/ephemeral/data/ceph" >&2 && exit 1
 echo 'Images resolved'
 echo -e "Kubernetes Boot Selection:\n\tkernel: $k8s_kernel\n\tinitrd: $k8s_initrd\n\tsquash: $k8s_squashfs"
 echo -e "Storage Boot Selection:\n\tkernel: $ceph_kernel\n\tinitrd: $ceph_initrd\n\tsquash: $ceph_squashfs"
@@ -119,7 +119,7 @@ for ncn in "${NCNS_K8S[@]}"; do
     fi
     ln -snf ..${k8s_kernel///var\/www} kernel
     ln -snf ..${k8s_initrd///var\/www} initrd.img.xz
-    ln -snf ..${k8s_squashfs///var\/www} filesystem.squashfs
+    ln -snf ..${k8s_squashfs///var\/www} rootfs
     popd >/dev/null
 done
 readarray -t NCNS_CEPH < <(grep -Eo 'ncn-s\w+' /var/lib/misc/dnsmasq.leases | sort -u)
@@ -132,7 +132,7 @@ for ncn in "${NCNS_CEPH[@]}"; do
     cp -p /var/www/boot/script.ipxe .
     ln -snf ..${ceph_kernel///var\/www} kernel
     ln -snf ..${ceph_initrd///var\/www} initrd.img.xz
-    ln -snf ..${ceph_squashfs///var\/www} filesystem.squashfs
+    ln -snf ..${ceph_squashfs///var\/www} rootfs
     popd >/dev/null
 done
 
