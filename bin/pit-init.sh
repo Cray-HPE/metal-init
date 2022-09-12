@@ -57,19 +57,19 @@ function init {
         set +e
         mount -a -v
         set -e
-        PIT_DATA="$(lsblk -o MOUNTPOINT -nr /dev/disk/by-label/PITDATA)"
+        PITDATA="$(lsblk -o MOUNTPOINT -nr /dev/disk/by-label/PITDATA)"
     else
         # PITDATA needs to exist before this script is called, because pit-init relies on items existing
         # within pitdata prior to running it.
         error "No DISK exists for PITDATA"
     fi
 
-    export PREP_DIR=${PIT_DATA}/prep
+    export PREP_DIR=${PITDATA}/prep
     if [ ! -d "$PREP_DIR" ]; then 
         error "$PREP_DIR does not exist! This needs to be created and populated with CSI input files before re-running this script"
     fi
-    export DATA_DIR=${PIT_DATA}/data
-    export CONF_DIR=${PIT_DATA}/configs
+    export DATA_DIR=${PITDATA}/data
+    export CONF_DIR=${PITDATA}/configs
 
     # Create our base directories if they do not already exist.
     if [ ! -d $DATA_DIR ]; then
