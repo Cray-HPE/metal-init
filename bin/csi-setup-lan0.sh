@@ -26,7 +26,8 @@ set -eu
 set +x
 if [ $# -lt 2 ]; then
 cat << EOM >&2
-  usage: csi-setup-lan0.sh CIDR|IP/MASQ GATEWAY DEVICE DNS1 DNS2
+  usage: csi-setup-lan0.sh CIDR|IP/MASQ GATEWAY DNS1 DEVICE1 [DEVICE2 DEVICEN]
+         csi-setup-lan0.sh CIDR|IP/MASQ GATEWAY 'DNS1 DNS2 DNSN' DEVICE1 [DEVICE2 DEVICEN]
   i.e.: csi-setup-lan0.sh 172.29.16.5/20 172.29.16.1 172.30.84.40 em1 [em2]
 EOM
   exit 1
