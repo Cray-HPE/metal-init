@@ -22,7 +22,7 @@
 
 %define install_dir /root/bin/
 
-Name: pit-init
+Name: %(echo $NAME)
 BuildArch: noarch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}
 License: HPE Proprietary
