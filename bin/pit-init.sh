@@ -41,6 +41,30 @@ function error() {
     ERROR=1
 }
 
+#######################################
+# Checks if a node is running on Google by checking for /etc/google_system
+# can be sourced from csm-common-library once that is live
+# Globals:
+#   None
+# Arguments:
+#   None
+# Output:
+#   None
+#   Returns 0 if /etc/google_system exists, 1 if not
+#######################################
+isgcp() {
+  # defaults to /etc/google_system, but can be overridden
+  _isgcp_identifier="etc/google_system"
+
+  # if the file exists, it is likely on GCP
+  [ -e "${_isgcp_identifier}" ] && return 0
+
+  # metal images can still be booted on GCP, so check if there are any disks vendored by Google
+  # if not, we conclude that this is not GCP
+  lsblk --noheadings -o vendor | grep -q Google
+  return $?
+}
+
 function init {
 
     echo 'Exporting tokens'
@@ -65,7 +89,7 @@ function init {
     fi
 
     export PREP_DIR=${PITDATA}/prep
-    if [ ! -d "$PREP_DIR" ]; then 
+    if [ ! -d "$PREP_DIR" ]; then
         error "$PREP_DIR does not exist! This needs to be created and populated with CSI input files before re-running this script"
     fi
     export DATA_DIR=${PITDATA}/data
@@ -86,7 +110,7 @@ function load_csi {
 
     if [ ! -f $csi_conf ] ; then
         # TODO: MTL-1695 Update this to point to the new example system_config.yaml file.
-        error 'CSI needs inputs; no $csi_conf file detected!'
+        error "CSI needs inputs; no $csi_conf file detected!"
         die 'See: https://github.com/Cray-HPE/docs-csm/blob/main/install/prepare_configuration_payload.md'
     fi
 
@@ -153,7 +177,7 @@ function load_site_init {
         "$yq_binary" merge -xP -i ${site_init}/customizations.yaml <($yq_binary prefix -P "${PREP_DIR}/${SYSTEM_NAME}/customizations.yaml" spec)
     else
         error 'yq is not available for merging generated IPs into customizations.yaml!'
-    fi 
+    fi
 
     if [ $site_init_error = 0 ] ; then
         echo 'Patching CA into data.json (cloud-init)'
@@ -180,17 +204,24 @@ function reload_interfaces {
 
 function load_and_start_systemd {
     # nexus takes longer to start, this ensures we fail-quickly on basecamp, conman, or dnsmasq if nexus is started by itself.
-    systemctl enable basecamp conman dnsmasq nexus
-    echo 'Restarting basecamp conman dnsmasq ... ' && systemctl restart basecamp conman dnsmasq
+    if ! isgcp; then
+      systemctl enable conman
+      echo 'Restarting conman ... ' && systemctl restart conman
+    fi
+    systemctl enable basecamp dnsmasq nexus
+    echo 'Restarting basecamp dnsmasq ... ' && systemctl restart basecamp dnsmasq
     echo 'Restarting nexus ... ' && systemctl restart nexus
 }
 
 function main {
+  # vshasta does not need certain parts of pit-init or are they incompatible with it
+  if ! isgcp /etc/google_system; then
     load_csi
     reload_interfaces
+    load_site_init
+  fi
     load_and_start_systemd
     load_ntp
-    load_site_init
 }
 
 echo 'Initializing the Pre-Install Toolkit'
