@@ -23,29 +23,48 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 set -eu
+
+function err_exit() {
+    echo "Error: $1" >&2
+    exit 1
+}
+
 set +x
-if [ $# -lt 2 ]; then
+if [ $# -lt 5 ]; then
 cat << EOM >&2
-  usage: csi-setup-lan0.sh CIDR|IP/MASQ GATEWAY DNS1 DEVICE1 [DEVICE2 DEVICEN]
-         csi-setup-lan0.sh CIDR|IP/MASQ GATEWAY 'DNS1 DNS2 DNSN' DEVICE1 [DEVICE2 DEVICEN]
-  i.e.: csi-setup-lan0.sh 172.29.16.5/20 172.29.16.1 172.30.84.40 em1 [em2]
+  usage: csi-setup-lan0.sh SYSTEM_NAME CIDR|IP/MASQ GATEWAY DNS1 DEVICE1 [DEVICE2 DEVICEN]
+         csi-setup-lan0.sh SYSTEM_NAME CIDR|IP/MASQ GATEWAY 'DNS1 DNS2 DNSN' DEVICE1 [DEVICE2 DEVICEN]
+  i.e.: csi-setup-lan0.sh your-system-name 172.29.16.5/20 172.29.16.1 172.30.84.40 em1 [em2]
 EOM
   exit 1
 fi
+
+system_name="$1" && shift
 cidr="$1" && shift
 gateway="$1" && shift
 dns="$1" && shift
 addr="$(echo $cidr | cut -d '/' -f 1)"
 mask="$(echo $cidr | cut -d '/' -f 2)"
+
+# https://en.wikipedia.org/wiki/Hostname
+if [[ ${#system_name} -gt 253 ]]; then
+    echo "Error: \$system_name must be less than or equal to 253 ASCII characters" 2>&1
+    exit 1
+fi
+hostname_regex='^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$'
+[[ $system_name =~ $hostname_regex ]] || err_exit "$system_name is not a valid hostname"
+
+sed -i "s/^BOOTPROTO=.*/BOOTPROTO='static'/g" /etc/sysconfig/network/ifcfg-lan0
 sed -i 's/^IPADDR=.*/IPADDR="'"${addr}"'\/'"${mask}"'"/g' /etc/sysconfig/network/ifcfg-lan0
 sed -i 's/^PREFIXLEN=.*/PREFIXLEN="'"${mask}"'"/g' /etc/sysconfig/network/ifcfg-lan0
 sed -i 's/^BRIDGE_PORTS=.*/BRIDGE_PORTS="'"$*"'"/g' /etc/sysconfig/network/ifcfg-lan0
 echo "default $gateway - -" >/etc/sysconfig/network/ifroute-lan0
 sed -i 's/NETCONFIG_DNS_STATIC_SERVERS=.*/NETCONFIG_DNS_STATIC_SERVERS="'"${dns:-9.9.9.9}"'"/' /etc/sysconfig/network/config
-netconfig update -f
-wicked ifdown lan0 && wicked ifup lan0
-systemctl restart wickedd-nanny # Shake out daemon handling of new lan0 name.
-rDNS_FQDN="$(nslookup $addr - $dns | awk '{print $NF}')"
-rDNS=$(echo $rDNS_FQDN | cut -d '.' -f1)
-hostnamectl set-hostname ${rDNS}-pit
+
+netconfig update -f || err_exit "netconfig update -f failed"
+wicked ifdown lan0 || err_exit "wicked ifdown lan0 failed"
+wicked ifup lan0 || err_exit "wicked ifup lan0 failed"
+# Shake out daemon handling of new lan0 name.
+systemctl restart wickedd-nanny || err_exit "systemctl restart wickedd-nanny failed"
+hostnamectl set-hostname ${system_name}-ncn-m001-pit || err_exit "hostnamectl set-hostname ${system_name}-pit failed"
 echo
