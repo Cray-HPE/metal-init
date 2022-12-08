@@ -66,5 +66,5 @@ wicked ifdown lan0 || err_exit "wicked ifdown lan0 failed"
 wicked ifup lan0 || err_exit "wicked ifup lan0 failed"
 # Shake out daemon handling of new lan0 name.
 systemctl restart wickedd-nanny || err_exit "systemctl restart wickedd-nanny failed"
-hostnamectl set-hostname ${system_name}-ncn-m001-pit || err_exit "hostnamectl set-hostname ${system_name}-pit failed"
+hostnamectl set-hostname ${system_name}-pit || err_exit "hostnamectl set-hostname ${system_name}-pit failed"
 echo
