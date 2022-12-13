@@ -212,9 +212,8 @@ function load_and_start_systemd {
     echo 'Restarting basecamp dnsmasq ... ' && systemctl restart basecamp dnsmasq
     echo 'Restarting nexus ... ' && systemctl restart nexus
     # Restarting observability services on CSM-PIT
-    systemctl restart grok-exporter.service
-    systemctl restart prometheus.service
-    systemctl restart grafana.service
+    systemctl enable grok-exporter.service prometheus.service grafana.service
+    echo 'Restarting grok-exporter, prometheus grafana' && systemctl restart grok-exporter.service prometheus.service grafana.service
 }
 
 function main {
