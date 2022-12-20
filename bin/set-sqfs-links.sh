@@ -116,6 +116,7 @@ for ncn in "${NCNS_K8S[@]}"; do
     cp -p /var/www/boot/script.ipxe .
     if [[ "$ncn" =~ 'ncn-w' ]]; then
         sed -i -E 's/rd.luks(=1)?\s/rd.luks=0 /g' script.ipxe
+        sed -i -E '/ncn-params .*/ s/$/ split_lock_detect=off/' script.ipxe
     fi
     ln -snf ..${k8s_kernel///var\/www} kernel
     ln -snf ..${k8s_initrd///var\/www} initrd.img.xz
