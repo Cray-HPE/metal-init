@@ -26,7 +26,7 @@
 set +e
 
 # Do not include CSI, csi version is invoked to give more specific version information that RPMs do not give.
-RPMS=( "canu" "ilorest" "metal-basecamp" "metal-ipxe" "metal-net-scripts" "pit-init" "pit-nexus" )
+RPMS=( "canu" "ilorest" "metal-basecamp" "metal-ipxe" "metal-net-scripts" "pit-init" "pit-nexus" "pit-observability" )
 echo '= PIT Identification = COPY/CUT START ======================================='
 cat /etc/pit-release
 csi version
