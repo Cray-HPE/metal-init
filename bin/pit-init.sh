@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -52,7 +52,7 @@ function error() {
 #   None
 #   Returns 0 if /etc/google_system exists, 1 if not
 #######################################
-isgcp() {
+function isgcp {
   # defaults to /etc/google_system, but can be overridden
   _isgcp_identifier="etc/google_system"
 
@@ -182,8 +182,7 @@ function load_site_init {
     if [ $site_init_error = 0 ] ; then
         echo 'Patching CA into data.json (cloud-init)'
         csi patch ca --cloud-init-seed-file ${CONF_DIR}/data.json --customizations-file ${site_init}/customizations.yaml --sealed-secret-key-file ${site_init}/certs/sealed_secrets.key
-        echo 'Restarting basecamp to pickup new data.json ... '
-        systemctl restart basecamp
+        echo 'Basecamp will need to be restarted in order to pickup the new CA - pit-init will restart this shortly.'
     else
         error "site-init does not exist at the expected location: $site_init"
     fi
@@ -204,17 +203,39 @@ function reload_interfaces {
 
 function load_and_start_systemd {
     # nexus takes longer to start, this ensures we fail-quickly on basecamp, conman, or dnsmasq if nexus is started by itself.
+    local services=(basecamp.service dnsmasq.service nexus.service grok-exporter.service prometheus.service grafana.service)
     if ! isgcp; then
-      systemctl enable conman
-      echo 'Restarting conman ... ' && systemctl restart conman
+        services+=(conman.service)
     fi
-    systemctl enable basecamp dnsmasq nexus
-    echo 'Restarting basecamp dnsmasq ... ' && systemctl restart basecamp dnsmasq
-    echo 'Restarting nexus ... ' && systemctl restart nexus
-    echo 'Starting grok-exporter, prometheus, and grafana'
-    systemctl stop grok-exporter.service prometheus.service grafana.service
-    systemctl enable --now grok-exporter.service prometheus.service grafana.service
-
+    services=($(printf '%s\n' "${services[@]}" | sort))
+    local max_retries=5
+    local error=0
+    local verb
+    for service in "${services[@]}"; do
+        retries=0
+        verb=start
+        systemctl stop $service
+        printf 'Starting %-30s ... ' $service
+        systemctl enable $service
+        while ! systemctl $verb $service >/dev/null 2>&1 ; do
+            if [[ $retries -ge $max_retries ]]; then
+                error=1
+                break
+            fi
+            verb=restart
+            retries=$((retries + 1))
+            sleep 1
+        done
+        if [ $error -ne 0 ]; then
+            echo >&2 "FAILED - Run: journalctl -xeu $service"
+            break
+        else
+            echo "DONE"
+        fi
+    done
+    if [ $error -ne 0 ]; then
+        error "Failed to start all systemd services."
+    fi
 }
 
 function main {
