@@ -211,13 +211,14 @@ function load_and_start_systemd {
     local max_retries=5
     local error=0
     local verb
+    echo "Starting [${#services[@]}] services ... some may take a few minutes."
     for service in "${services[@]}"; do
         retries=0
         verb=start
         systemctl stop $service
+        systemctl enable $service >/dev/null 2>&1
         printf 'Starting %-30s ... ' $service
-        systemctl enable $service
-        while ! systemctl $verb $service >/dev/null 2>&1 ; do
+        while ! time systemctl $verb $service >/dev/null 2>&1 ; do
             if [[ $retries -ge $max_retries ]]; then
                 error=1
                 break
@@ -230,7 +231,7 @@ function load_and_start_systemd {
             echo >&2 "FAILED - Run: journalctl -xeu $service"
             break
         else
-            echo "DONE"
+            echo "DONE - Moving on ... "
         fi
     done
     if [ $error -ne 0 ]; then
