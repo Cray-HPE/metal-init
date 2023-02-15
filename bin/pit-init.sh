@@ -207,7 +207,7 @@ function load_and_start_systemd {
     if ! isgcp; then
         services+=(conman.service)
     fi
-    services=($(printf '%s\n' "${services[@]}" | sort))
+    mapfile -t services < <(printf '%s\n' "${services[@]}" | sort)
     local max_retries=5
     local error=0
     local verb
