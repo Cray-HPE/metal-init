@@ -63,10 +63,10 @@ function call_bmc {
 
 # Finds latest of each artifact regardless of subdirectory.
 echo "Resolving images to boot ... "
-k8s_initrd="$(find ${WEB_ROOT}/ephemeral/data/k8s -name "*initrd*" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
+k8s_initrd="$(find ${WEB_ROOT}/ephemeral/data/k8s -name "initrd*" -printf '%T@ %p\n' | grep -v '.txt' | sort -n | tail -1 |  cut -f2- -d" ")"
 k8s_kernel="$(find ${WEB_ROOT}/ephemeral/data/k8s -name "*.kernel" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
 k8s_squashfs="$(find ${WEB_ROOT}/ephemeral/data/k8s -name "*.squashfs" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
-ceph_initrd="$(find ${WEB_ROOT}/ephemeral/data/ceph -name "*initrd*" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
+ceph_initrd="$(find ${WEB_ROOT}/ephemeral/data/ceph -name "initrd*" -printf '%T@ %p\n' | grep -v '.txt' | sort -n | tail -1 |  cut -f2- -d" ")"
 ceph_kernel="$(find ${WEB_ROOT}/ephemeral/data/ceph -name "*.kernel" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
 ceph_squashfs="$(find ${WEB_ROOT}/ephemeral/data/ceph -name "*.squashfs" -printf '%T@ %p\n' | sort -n | tail -1 |  cut -f2- -d" ")"
 
