@@ -42,7 +42,7 @@ pipeline {
 
     environment {
         NAME = getRepoName()
-        VERSION = sh(returnStdout: true, script: "git describe --tags | tr -s '-' '~' | tr -d '^v'").trim()
+        VERSION = sh(returnStdout: true, script: "git describe --tags | tr -s '-' '~' | sed 's/^v//'").trim()
     }
 
     stages {
