@@ -28,23 +28,27 @@ ifeq ($(VERSION),)
 VERSION := $(shell git describe --tags | tr -s '-' '~' | sed 's/^v//')
 endif
 
-SPEC_FILE ?= ${NAME}.spec
-SOURCE_NAME ?= ${NAME}
+SPEC_FILE := ${NAME}.spec
+SOURCE_NAME := ${NAME}-${VERSION}
+
 BUILD_DIR ?= $(PWD)/dist/rpmbuild
-SOURCE_PATH := ${BUILD_DIR}/SOURCES/${SOURCE_NAME}-${VERSION}.tar.bz2
+SOURCE_PATH := ${BUILD_DIR}/SOURCES/${SOURCE_NAME}.tar.bz2
 
 rpm: prepare rpm_package_source rpm_build_source rpm_build
 
 prepare:
+	@echo $(NAME)
 	rm -rf $(BUILD_DIR)
 	mkdir -p $(BUILD_DIR)/SPECS $(BUILD_DIR)/SOURCES
 	cp $(SPEC_FILE) $(BUILD_DIR)/SPECS/
 
+# touch the archive before creating it to prevent 'tar: .: file changed as we read it' errors
 rpm_package_source:
-	tar --transform 'flags=r;s,^,/${NAME}-${VERSION}/,' --exclude .git --exclude dist -cvjf $(SOURCE_PATH) .
+	touch $(SOURCE_PATH)
+	tar --transform 'flags=r;s,^,/$(SOURCE_NAME)/,' --exclude .nox --exclude dist/rpmbuild --exclude ${SOURCE_NAME}.tar.bz2 -cvjf $(SOURCE_PATH) .
 
 rpm_build_source:
-	rpmbuild --nodeps -ts $(SOURCE_PATH) --define "_topdir $(BUILD_DIR)"
+	rpmbuild -bs $(BUILD_DIR)/SPECS/$(SPEC_FILE) --define "_topdir $(BUILD_DIR)"
 
 rpm_build:
-	rpmbuild --nodeps -ba $(SPEC_FILE) --define "_topdir $(BUILD_DIR)"
+	rpmbuild -ba $(BUILD_DIR)/SPECS/$(SPEC_FILE) --define "_topdir $(BUILD_DIR)"
