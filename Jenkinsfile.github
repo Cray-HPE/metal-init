@@ -26,7 +26,7 @@
 @Library('csm-shared-library') _
 
 def isStable = env.TAG_NAME != null ? true : false
-def sleImage = 'artifactory.algol60.net/csm-docker/stable/csm-docker-sle'
+def sleImage = 'artifactory.algol60.net/csm-docker/stable/csm-docker-sle:latest'
 pipeline {
 
     agent {
@@ -42,94 +42,111 @@ pipeline {
 
     environment {
         ARCH = 'noarch'
+        BUILD_DIR = "${env.WORKSPACE}/dist/rpmbuild/${ARCH}"
         NAME = getRepoName()
         PRIMARY_NODE = "${env.NODE_NAME}"
         VERSION = sh(returnStdout: true, script: "git describe --tags | tr -s '-' '~' | sed 's/^v//'").trim()
     }
-
     stages {
-
-        stage('Build & Publish') {
-
-            matrix {
-
-                environment {
-                    BUILD_DIR = "${env.WORKSPACE}/dist/rpmbuild/${ARCH}/${SLE_VERSION}"
+        stage('Prepare: RPMs') {
+            agent {
+                docker {
+                    label "${PRIMARY_NODE}"
+                    reuseNode true
+                    args "-v /home/jenkins/.ssh:/home/jenkins/.ssh"
+                    image "${sleImage}"
                 }
-
-
-                axes {
-                    axis {
-                        name 'SLE_VERSION'
-                        values '15.4', '15.3', '15.2'
-                    }
+            }
+            steps {
+                sh "make prepare"
+                dir("${env.BUILD_DIR}/SPECS/") {
+                    runLibraryScript("addRpmMetaData.sh", "${env.NAME}.spec")
                 }
+            }
+        }
 
-                stages {
+        stage('Build: RPMs') {
+            agent {
+                docker {
+                    label "${PRIMARY_NODE}"
+                    reuseNode true
+                    args "-v /home/jenkins/.ssh:/home/jenkins/.ssh"
+                    image "${sleImage}"
+                }
+            }
+            steps {
+                sh "make rpm"
+            }
+        }
 
-                    stage('Prepare: RPMs') {
-                        agent {
-                            docker {
-                                label "${PRIMARY_NODE}"
-                                reuseNode true
-                                args "-v /home/jenkins/.ssh:/home/jenkins/.ssh"
-                                image "${sleImage}:${SLE_VERSION}"
-                            }
-                        }
-                        steps {
-                            sh "make prepare"
-                            dir("${env.BUILD_DIR}/SPECS/") {
-                                runLibraryScript("addRpmMetaData.sh", "${env.NAME}.spec")
-                            }
-                        }
-                    }
-
-                    stage('Build: RPMs') {
-                        agent {
-                            docker {
-                                label "${PRIMARY_NODE}"
-                                reuseNode true
-                                args "-v /home/jenkins/.ssh:/home/jenkins/.ssh"
-                                image "${sleImage}:${SLE_VERSION}"
-                            }
-                        }
-                        steps {
-                            sh "make rpm"
-                        }
-                    }
-
-                    stage('Publish: RPMs') {
-                        agent {
-                            docker {
-                                label "${PRIMARY_NODE}"
-                                reuseNode true
-                                args "-v /home/jenkins/.ssh:/home/jenkins/.ssh"
-                                image "${sleImage}:${SLE_VERSION}"
-                            }
-                        }
-                        steps {
-                            script {
-                                def sleVersion = sh(returnStdout: true, script: 'awk -F= \'/VERSION_ID/{gsub(/["]/,""); print \$NF}\' /etc/os-release').trim()
-                                def sles_version_parts = "${sleVersion}".tokenize('.')
-                                def sles_major = "${sles_version_parts[0]}"
-                                def sles_minor = "${sles_version_parts[1]}"
-                                publishCsmRpms(
-                                        arch: "${ARCH}",
-                                        component: env.NAME,
-                                        isStable: isStable,
-                                        os: "sle-${sles_major}sp${sles_minor}",
-                                        pattern: "dist/rpmbuild/${ARCH}/${SLE_VERSION}/RPMS/${ARCH}/*.rpm",
-                                )
-                                publishCsmRpms(
-                                        arch: "src",
-                                        component: env.NAME,
-                                        isStable: isStable,
-                                        os: "sle-${sles_major}sp${sles_minor}",
-                                        pattern: "dist/rpmbuild/${ARCH}/${SLE_VERSION}/SRPMS/*.rpm",
-                                )
-                            }
-                        }
-                    }
+        stage('Publish: RPMs') {
+            agent {
+                docker {
+                    label "${PRIMARY_NODE}"
+                    reuseNode true
+                    args "-v /home/jenkins/.ssh:/home/jenkins/.ssh"
+                    image "${sleImage}"
+                }
+            }
+            steps {
+                script {
+                    publishCsmRpms(
+                            arch: "${ARCH}",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "noos",
+                            pattern: "dist/rpmbuild/${ARCH}/RPMS/${ARCH}/*.rpm",
+                    )
+                    publishCsmRpms(
+                            arch: "src",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "noos",
+                            pattern: "dist/rpmbuild/${ARCH}/SRPMS/*.rpm",
+                    )
+                    // TODO: Remove all of the following publish calls once we are comfortable using noos.
+                    publishCsmRpms(
+                            arch: "${ARCH}",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "sle-15sp4",
+                            pattern: "dist/rpmbuild/${ARCH}/RPMS/${ARCH}/*.rpm",
+                    )
+                    publishCsmRpms(
+                            arch: "src",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "sle-15sp4",
+                            pattern: "dist/rpmbuild/${ARCH}/SRPMS/*.rpm",
+                    )
+                    publishCsmRpms(
+                            arch: "${ARCH}",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "sle-15sp3",
+                            pattern: "dist/rpmbuild/${ARCH}/RPMS/${ARCH}/*.rpm",
+                    )
+                    publishCsmRpms(
+                            arch: "src",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "sle-15sp3",
+                            pattern: "dist/rpmbuild/${ARCH}/SRPMS/*.rpm",
+                    )
+                    publishCsmRpms(
+                            arch: "${ARCH}",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "sle-15sp2",
+                            pattern: "dist/rpmbuild/${ARCH}/RPMS/${ARCH}/*.rpm",
+                    )
+                    publishCsmRpms(
+                            arch: "src",
+                            component: env.NAME,
+                            isStable: isStable,
+                            os: "sle-15sp2",
+                            pattern: "dist/rpmbuild/${ARCH}/SRPMS/*.rpm",
+                    )
                 }
             }
         }

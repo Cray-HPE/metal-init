@@ -41,6 +41,23 @@ function error() {
     ERROR=1
 }
 
+function usage() {
+cat << 'EOF'
+environment variables:
+SYSTEM_NAME The name of the system. Used when generating configuration files.
+CSM_RELEASE The CSM release version (the name of the CSM tarball). Necessary for resolving the `cloud-init.yaml` file unless `-p` is provided with a custom path.
+PITDATA     (optional) The mountpoint of the PITDATA volume. This is auto-resolved if left unset.
+
+usage:
+
+-C      Skip patching `data.json` with `customizations.yaml`'s CA certificate.
+-P      Skip patching `data.json` with a `cloud-init.yaml` file for repo and package definitions.
+-p      Provide a custom path for `cloud-init.yaml`.
+-h      Print this help message.
+EOF
+}
+
+
 #######################################
 # Checks if a node is running on Google by checking for /etc/google_system
 # can be sourced from csm-common-library once that is live
@@ -138,6 +155,12 @@ function load_ntp {
 }
 
 function load_site_init {
+
+    if [ "$skip_customizations" -ne 0 ]; then
+        echo 'skip_customizations was true. Not patching data.json with cloud-init package and repository manifests.'
+        return 0
+    fi
+
     site_init=${PREP_DIR}/site-init
     local site_init_error=0
     local yq_error=0
@@ -186,6 +209,44 @@ function load_site_init {
     else
         error "site-init does not exist at the expected location: $site_init"
     fi
+}
+
+function load_packages {
+
+    local config_file
+
+    if [ "$skip_packages" -ne 0 ]; then
+        echo 'skip_packages was true. Not patching data.json with cloud-init package and repository manifests.'
+        return 0
+    fi
+
+    # `csi patch packages` will return 0 if the command does not exist, 1 otherwise.
+    if csi patch packages >/dev/null 2>&1; then
+        echo 'The installed version of CSI does not have the `csi patch packages` command. data.json will not be patched with packages and repository manifests.'
+        return 0
+    fi
+
+    if [ -z "${package_file}" ]; then
+        if [ -z "${CSM_RELEASE}" ]; then
+            error 'No CSM tarball could be resolved, CSM_RELEASE was unset! If this is intentional, re-run this script with `-P` to skip this step or provide a custom cloud-init.yaml file with `-p`.'
+        elif [ ! -d "$PITDATA/$CSM_RELEASE" ]; then
+            error "The CSM tarball is either missing, or was never extracted! Could not find $PITDATA/$CSM_RELEASE"
+        elif [ ! -f "${PITDATA}/${CSM_RELEASE}/rpm/cloud-init.yaml" ]; then
+            echo 'cloud-init.yaml was not found in the tarball! This release likely does not support cloud-init package installs. Skipping patching data.json with repos and packages.'
+            return 0
+        else
+            echo "Using cloud-init.yaml from the CSM release tarball: ${PITDATA}/${CSM_RELEASE}/rpm/cloud-init.yaml"
+            config_file="${PITDATA}/${CSM_RELEASE}/rpm/cloud-init.yaml"
+        fi
+    elif [ ! -f "${package_file}" ]; then
+        error "The custom cloud-init.yaml file provided on the command line did not exist!"
+    else
+        echo "Using custom cloud-init.yaml at $package_file"
+        config_file="$package_file"
+    fi
+
+    csi patch packages --cloud-init-seed-file "${CONF_DIR}/data.json" --config-file "$config_file"
+    echo 'Basecamp will need to be restarted in order to pickup the new repo and package lists - pit-init will restart this shortly.'
 }
 
 function reload_interfaces {
@@ -245,10 +306,35 @@ function main {
     load_csi
     reload_interfaces
     load_site_init
+    load_packages
   fi
     load_and_start_systemd
     load_ntp
 }
+
+skip_customizations=0
+skip_packages=0
+while getopts "hCPp:" o; do
+    case "${o}" in
+        C)
+            skip_customizations=1
+            ;;
+        P)
+            skip_packages=1
+            ;;
+        p)
+            package_file="${OPTARG}"
+            ;;
+        h)
+            usage
+            exit 0
+            ;;
+        *)
+            :
+            ;;
+    esac
+done
+shift $((OPTIND-1))
 
 echo 'Initializing the Pre-Install Toolkit'
 init
