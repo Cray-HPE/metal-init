@@ -140,7 +140,7 @@ function load_csi {
     csi config init
     cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/
     cp -pv $SYSTEM_NAME/dnsmasq.d/* /etc/dnsmasq.d/
-    cp -pv $SYSTEM_NAME/basecamp/data.json /var/www/ephemeral/configs/
+    cp -pv $SYSTEM_NAME/basecamp/data.json "$PITDATA/configs/"
     cp -pv $SYSTEM_NAME/conman.conf /etc
     popd
 }
@@ -214,6 +214,7 @@ function load_site_init {
 function load_packages {
 
     local config_file
+    local csm_path="$PITDATA/csm-${CSM_RELEASE}"
 
     if [ "$skip_packages" -ne 0 ]; then
         echo 'skip_packages was true. Not patching data.json with cloud-init package and repository manifests.'
@@ -229,14 +230,14 @@ function load_packages {
     if [ -z "${package_file}" ]; then
         if [ -z "${CSM_RELEASE}" ]; then
             error 'No CSM tarball could be resolved, CSM_RELEASE was unset! If this is intentional, re-run this script with `-P` to skip this step or provide a custom cloud-init.yaml file with `-p`.'
-        elif [ ! -d "$PITDATA/$CSM_RELEASE" ]; then
-            error "The CSM tarball is either missing, or was never extracted! Could not find $PITDATA/$CSM_RELEASE"
-        elif [ ! -f "${PITDATA}/${CSM_RELEASE}/rpm/cloud-init.yaml" ]; then
+        elif [ ! -d "$csm_path" ]; then
+            error "The CSM tarball is either missing, or was never extracted! Could not find $csm_path"
+        elif [ ! -f "$csm_path/rpm/cloud-init.yaml" ]; then
             echo 'cloud-init.yaml was not found in the tarball! This release likely does not support cloud-init package installs. Skipping patching data.json with repos and packages.'
             return 0
         else
-            echo "Using cloud-init.yaml from the CSM release tarball: ${PITDATA}/${CSM_RELEASE}/rpm/cloud-init.yaml"
-            config_file="${PITDATA}/${CSM_RELEASE}/rpm/cloud-init.yaml"
+            echo "Using cloud-init.yaml from the CSM release tarball: $csm_path/rpm/cloud-init.yaml"
+            config_file="$csm_path/rpm/cloud-init.yaml"
         fi
     elif [ ! -f "${package_file}" ]; then
         error "The custom cloud-init.yaml file provided on the command line did not exist!"
