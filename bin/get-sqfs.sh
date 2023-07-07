@@ -63,11 +63,19 @@ ARCH=$(uname -m)
 DEST="/var/www/ephemeral/data"
 use_proxy=no
 http_proxy='null'
-while getopts ":k:H:p:s:a:P:d:" o; do
+while getopts ":k:H:p:s:a:P:d:M:K:" o; do
     case "${o}" in
         k)
             KUBERNETES_ID=${OPTARG}
             bucket='kubernetes'
+            ;;
+        K)
+            KUBERNETES_VM_ID=${OPTARG}
+            bucket='kubernetes-vm'
+            ;;
+        M)
+            MANAGEMENT_VM_ID=${OPTARG}
+            bucket='management-vm'
             ;;
         H)
             HYPERVISOR_ID=${OPTARG}
@@ -99,7 +107,9 @@ done
 shift $((OPTIND-1))
 
 # By default, if an ID is given without any flags always download the NCN images (kubernetes + storage-ceph).
-if [ -z ${KUBERNETES_ID} ] && [ -z ${STORAGE_CEPH_ID} ] && [ -z ${HYPERVISOR_ID} ] && [ -z ${PRE_INSTALL_TOOLKIT_ID} ]; then
+if [ -z ${KUBERNETES_ID} ] && [ -z ${STORAGE_CEPH_ID} ] && \
+   [ -z ${HYPERVISOR_ID} ] && [ -z ${PRE_INSTALL_TOOLKIT_ID} ] && \
+   [ -z ${KUBERNETES_VM_ID} ] && [ -z ${MANAGEMENT_VM_ID} ]; then
     if [ -z "${*}" ]; then
         echo >&2 'Missing image ID (e.g. X.Y.Z or COMMIT-TIMESTAMP)'
         exit 1
@@ -166,6 +176,54 @@ if [ -n "${HYPERVISOR_ID}" ]; then
         [ ! -f $file ] && echo >&2 Failed to download the kernel.
     done
     ls -l ${HYPERVISOR_ID}/
+    popd || exit
+    unset bucket
+fi
+
+
+if [ -n "${KUBERNETES_VM_ID}" ]; then
+    if [ -z "${bucket}" ]; then
+        bucket=kubernetes-vm
+    fi
+
+    stream=unstable
+    if [[ "$KUBERNETES_VM_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
+        stream=stable
+    fi
+
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    mkdir -pv ${DEST}/${bucket}
+    pushd ${DEST}/${bucket} || return
+    echo Downloading ${bucket} artifacts ...
+    wget --progress=bar:force:noscroll -e use_proxy=${use_proxy} -e https_proxy=${http_proxy} -e http_proxy=${http_proxy} -q --show-progress -r -N -l 1 --no-remove-listing -np -nH --cut-dirs=4 -A *.qcow2 -R index.html* -e robots=off "${artifactory_url}/${KUBERNETES_VM_ID}/"
+    for file in ${KUBERNETES_VM_ID}/${bucket}*.qcow2; do
+        [ ! -f $file ] && echo >&2 Failed to download qcow2.
+    done
+    ls -l ${KUBERNETES_VM_ID}/
+    popd || exit
+    unset bucket
+fi
+
+
+if [ -n "${MANAGEMENT_VM_ID}" ]; then
+    if [ -z "${bucket}" ]; then
+        bucket=management-vm
+    fi
+
+    stream=unstable
+    if [[ "$MANAGEMENT_VM_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
+        stream=stable
+    fi
+
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    mkdir -pv ${DEST}/${bucket}
+    pushd ${DEST}/${bucket} || return
+    echo Downloading ${bucket} artifacts ...
+    wget --progress=bar:force:noscroll -e use_proxy=${use_proxy} -e https_proxy=${http_proxy} -e http_proxy=${http_proxy} -q --show-progress -r -N -l 1 --no-remove-listing -np -nH --cut-dirs=4 -A *.qcow2 -R index.html* -e robots=off "${artifactory_url}/${MANAGEMENT_VM_ID}/"
+    for file in ${MANAGEMENT_VM_ID}/${bucket}*.qcow2; do
+        [ ! -f $file ] && echo >&2 Failed to download qcow2.
+    done
+    ls -l ${MANAGEMENT_VM_ID}/
     popd || exit
     unset bucket
 fi
