@@ -63,7 +63,7 @@ ARCH=$(uname -m)
 DEST="/var/www/ephemeral/data"
 use_proxy=no
 http_proxy='null'
-while getopts ":k:H:p:s:a:P:d:M:K:" o; do
+while getopts ":k:H:p:s:a:P:d:M:K:f:" o; do
     case "${o}" in
         k)
             KUBERNETES_ID=${OPTARG}
@@ -76,6 +76,10 @@ while getopts ":k:H:p:s:a:P:d:M:K:" o; do
         M)
             MANAGEMENT_VM_ID=${OPTARG}
             bucket='management-vm'
+            ;;
+        f)
+            FAWKES_LIVE_ID=${OPTARG}
+            bucket='fawkes-live'
             ;;
         H)
             HYPERVISOR_ID=${OPTARG}
@@ -277,5 +281,28 @@ if [ -n "${PRE_INSTALL_TOOLKIT_ID}" ]; then
     fi
     [ ! -f ${bucket}-${PRE_INSTALL_TOOLKIT_ID}-${ARCH}.iso ] && echo >&2 "Failed to download ${bucket}-${PRE_INSTALL_TOOLKIT_ID}-${ARCH}.iso"
     echo "Downloaded ISO to $(pwd)/${bucket}-${PRE_INSTALL_TOOLKIT_ID}-${ARCH}.iso"
+    popd || exit
+fi
+
+if [ -n "${FAWKES_LIVE_ID}" ]; then
+    if [ -z "${bucket}" ]; then
+        bucket=fawkes-live
+    fi
+
+    stream=unstable
+    if [[ "$FAWKES_LIVE_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
+        stream=stable
+    fi
+
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    pushd ${DEST} || return
+    echo "Downloading ${bucket} ISO with ID: ${FAWKES_LIVE_ID}"
+    if [ "${use_proxy}" = 'yes' ]; then
+        curl --proxy ${http_proxy} -C - -f -O "${artifactory_url}/${FAWKES_LIVE_ID}/${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso"
+    else
+        curl -C - -f -O "${artifactory_url}/${FAWKES_LIVE_ID}/${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso"
+    fi
+    [ ! -f ${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso ] && echo >&2 "Failed to download ${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso"
+    echo "Downloaded ISO to $(pwd)/${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso"
     popd || exit
 fi
