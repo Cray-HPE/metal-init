@@ -111,9 +111,10 @@ done
 shift $((OPTIND-1))
 
 # By default, if an ID is given without any flags always download the NCN images (kubernetes + storage-ceph).
-if [ -z ${KUBERNETES_ID} ] && [ -z ${STORAGE_CEPH_ID} ] && \
-   [ -z ${HYPERVISOR_ID} ] && [ -z ${PRE_INSTALL_TOOLKIT_ID} ] && \
-   [ -z ${KUBERNETES_VM_ID} ] && [ -z ${MANAGEMENT_VM_ID} ]; then
+if [ -z "${KUBERNETES_ID}" ] && [ -z "${STORAGE_CEPH_ID}" ] && \
+   [ -z "${HYPERVISOR_ID}" ] && [ -z "${PRE_INSTALL_TOOLKIT_ID}" ] && \
+   [ -z "${KUBERNETES_VM_ID}" ] && [ -z "${MANAGEMENT_VM_ID}" ] && \
+   [ -z "${FAWKES_LIVE_ID}" ]; then
     if [ -z "${*}" ]; then
         echo >&2 'Missing image ID (e.g. X.Y.Z or COMMIT-TIMESTAMP)'
         exit 1
