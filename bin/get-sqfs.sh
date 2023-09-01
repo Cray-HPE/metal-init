@@ -153,86 +153,6 @@ if [ -n "${STORAGE_CEPH_ID}" ]; then
     unset bucket
 fi
 
-if [ -n "${HYPERVISOR_ID}" ]; then
-    if [ -z "${bucket}" ]; then
-        bucket=hypervisor
-    fi
-
-    stream=unstable
-    if [[ "$HYPERVISOR_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
-        stream=stable
-    fi
-
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
-    mkdir -pv ${DEST}/${bucket}
-    pushd ${DEST}/${bucket} || return
-    echo Downloading ${bucket} artifacts ...
-    wget --progress=bar:force:noscroll -e use_proxy=${use_proxy} -e https_proxy=${http_proxy} -e http_proxy=${http_proxy} -q --show-progress -r -N -l 1 --no-remove-listing -np -nH --cut-dirs=4 -A *.kernel,*initrd*,*.squashfs,*.iso -R index.html* -e robots=off "${artifactory_url}/${HYPERVISOR_ID}/"
-    for file in ${HYPERVISOR_ID}/${bucket}*.iso; do
-        [ ! -f $file ] && echo >&2 Failed to download ISO.
-    done
-    for file in ${HYPERVISOR_ID}/${bucket}*.squashfs; do
-        [ ! -f $file ] && echo >&2 Failed to download SquashFS.
-    done
-    for file in ${HYPERVISOR_ID}/initrd.img*; do
-        [ ! -f $file ] && echo >&2 Failed to download initrd.img.xz.
-    done
-    for file in ${HYPERVISOR_ID}/*kernel; do
-        [ ! -f $file ] && echo >&2 Failed to download the kernel.
-    done
-    ls -l ${HYPERVISOR_ID}/
-    popd || exit
-    unset bucket
-fi
-
-
-if [ -n "${KUBERNETES_VM_ID}" ]; then
-    if [ -z "${bucket}" ]; then
-        bucket=kubernetes-vm
-    fi
-
-    stream=unstable
-    if [[ "$KUBERNETES_VM_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
-        stream=stable
-    fi
-
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
-    mkdir -pv ${DEST}/${bucket}
-    pushd ${DEST}/${bucket} || return
-    echo Downloading ${bucket} artifacts ...
-    wget --progress=bar:force:noscroll -e use_proxy=${use_proxy} -e https_proxy=${http_proxy} -e http_proxy=${http_proxy} -q --show-progress -r -N -l 1 --no-remove-listing -np -nH --cut-dirs=4 -A *.qcow2 -R index.html* -e robots=off "${artifactory_url}/${KUBERNETES_VM_ID}/"
-    for file in ${KUBERNETES_VM_ID}/${bucket}*.qcow2; do
-        [ ! -f $file ] && echo >&2 Failed to download qcow2.
-    done
-    ls -l ${KUBERNETES_VM_ID}/
-    popd || exit
-    unset bucket
-fi
-
-
-if [ -n "${MANAGEMENT_VM_ID}" ]; then
-    if [ -z "${bucket}" ]; then
-        bucket=management-vm
-    fi
-
-    stream=unstable
-    if [[ "$MANAGEMENT_VM_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
-        stream=stable
-    fi
-
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
-    mkdir -pv ${DEST}/${bucket}
-    pushd ${DEST}/${bucket} || return
-    echo Downloading ${bucket} artifacts ...
-    wget --progress=bar:force:noscroll -e use_proxy=${use_proxy} -e https_proxy=${http_proxy} -e http_proxy=${http_proxy} -q --show-progress -r -N -l 1 --no-remove-listing -np -nH --cut-dirs=4 -A *.qcow2 -R index.html* -e robots=off "${artifactory_url}/${MANAGEMENT_VM_ID}/"
-    for file in ${MANAGEMENT_VM_ID}/${bucket}*.qcow2; do
-        [ ! -f $file ] && echo >&2 Failed to download qcow2.
-    done
-    ls -l ${MANAGEMENT_VM_ID}/
-    popd || exit
-    unset bucket
-fi
-
 if [ -n "${KUBERNETES_ID}" ]; then
     if [ -z "${bucket}" ]; then
         bucket=kubernetes
@@ -305,5 +225,74 @@ if [ -n "${FAWKES_LIVE_ID}" ]; then
     fi
     [ ! -f ${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso ] && echo >&2 "Failed to download ${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso"
     echo "Downloaded ISO to $(pwd)/${bucket}-${FAWKES_LIVE_ID}-${ARCH}.iso"
+    popd || exit
+fi
+
+if [ -n "${HYPERVISOR_ID}" ]; then
+    if [ -z "${bucket}" ]; then
+        bucket=hypervisor
+    fi
+
+    stream=unstable
+    if [[ "$HYPERVISOR_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
+        stream=stable
+    fi
+
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    pushd ${DEST} || return
+    echo "Downloading ${bucket} ISO with ID: ${HYPERVISOR_ID}"
+    if [ "${use_proxy}" = 'yes' ]; then
+        curl --proxy ${http_proxy} -C - -f -O "${artifactory_url}/${HYPERVISOR_ID}/${bucket}-${HYPERVISOR_ID}-${ARCH}.iso"
+    else
+        curl -C - -f -O "${artifactory_url}/${HYPERVISOR_ID}/${bucket}-${HYPERVISOR_ID}-${ARCH}.iso"
+    fi
+    [ ! -f ${bucket}-${HYPERVISOR_ID}-${ARCH}.iso ] && echo >&2 "Failed to download ${bucket}-${HYPERVISOR_ID}-${ARCH}.iso"
+    echo "Downloaded ISO to $(pwd)/${bucket}-${HYPERVISOR_ID}-${ARCH}.iso"
+    popd || exit
+fi
+
+if [ -n "${KUBERNETES_VM_ID}" ]; then
+    if [ -z "${bucket}" ]; then
+        bucket=hypervisor
+    fi
+
+    stream=unstable
+    if [[ "$KUBERNETES_VM_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
+        stream=stable
+    fi
+
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    pushd ${DEST} || return
+    echo "Downloading ${bucket} ISO with ID: ${KUBERNETES_VM_ID}"
+    if [ "${use_proxy}" = 'yes' ]; then
+        curl --proxy ${http_proxy} -C - -f -O "${artifactory_url}/${KUBERNETES_VM_ID}/${bucket}-${KUBERNETES_VM_ID}-${ARCH}.qcow2"
+    else
+        curl -C - -f -O "${artifactory_url}/${KUBERNETES_VM_ID}/${bucket}-${KUBERNETES_VM_ID}-${ARCH}.iso"
+    fi
+    [ ! -f ${bucket}-${KUBERNETES_VM_ID}-${ARCH}.iso ] && echo >&2 "Failed to download ${bucket}-${KUBERNETES_VM_ID}-${ARCH}.qcow2"
+    echo "Downloaded ISO to $(pwd)/${bucket}-${KUBERNETES_VM_ID}-${ARCH}.iso"
+    popd || exit
+fi
+
+if [ -n "${MANAGEMENT_VM_ID}" ]; then
+    if [ -z "${bucket}" ]; then
+        bucket=hypervisor
+    fi
+
+    stream=unstable
+    if [[ "$MANAGEMENT_VM_ID" =~ [0-9]*\.[0-9]*\.[0-9]*$ ]]; then
+        stream=stable
+    fi
+
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    pushd ${DEST} || return
+    echo "Downloading ${bucket} ISO with ID: ${MANAGEMENT_VM_ID}"
+    if [ "${use_proxy}" = 'yes' ]; then
+        curl --proxy ${http_proxy} -C - -f -O "${artifactory_url}/${MANAGEMENT_VM_ID}/${bucket}-${MANAGEMENT_VM_ID}-${ARCH}.qcow2"
+    else
+        curl -C - -f -O "${artifactory_url}/${MANAGEMENT_VM_ID}/${bucket}-${MANAGEMENT_VM_ID}-${ARCH}.iso"
+    fi
+    [ ! -f ${bucket}-${MANAGEMENT_VM_ID}-${ARCH}.iso ] && echo >&2 "Failed to download ${bucket}-${MANAGEMENT_VM_ID}-${ARCH}.qcow2"
+    echo "Downloaded ISO to $(pwd)/${bucket}-${MANAGEMENT_VM_ID}-${ARCH}.iso"
     popd || exit
 fi
