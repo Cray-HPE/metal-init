@@ -22,7 +22,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-base_url=artifactory.algol60.net/artifactory/csm-images
+base_url=artifactory.algol60.net/artifactory
 
 function usage {
 cat << 'EOF'
@@ -63,35 +63,43 @@ ARCH=$(uname -m)
 DEST="/var/www/ephemeral/data"
 use_proxy=no
 http_proxy='null'
+repository='csm-images'
 while getopts ":k:H:p:s:a:P:d:M:K:f:" o; do
     case "${o}" in
         k)
             KUBERNETES_ID=${OPTARG}
             bucket='kubernetes'
+            repository='csm-images'
             ;;
         K)
             KUBERNETES_VM_ID=${OPTARG}
             bucket='kubernetes-vm'
+            repository='fawkes-images'
             ;;
         M)
             MANAGEMENT_VM_ID=${OPTARG}
             bucket='management-vm'
+            repository='fawkes-images'
             ;;
         f)
             FAWKES_LIVE_ID=${OPTARG}
             bucket='fawkes-live'
+            repository='fawkes-images'
             ;;
         H)
             HYPERVISOR_ID=${OPTARG}
             bucket='hypervisor'
+            repository='fawkes-images'
             ;;
         p)
             PRE_INSTALL_TOOLKIT_ID=${OPTARG}
             bucket='pre-install-toolkit'
+            repository='csm-images'
             ;;
         s)
             STORAGE_CEPH_ID=${OPTARG}
             bucket='storage-ceph'
+            repository='csm-images'
             ;;
         a)
             ARCH=${OPTARG}
@@ -134,7 +142,7 @@ if [ -n "${STORAGE_CEPH_ID}" ]; then
         stream=stable
     fi
 
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${repository}/${stream}/${bucket}
     mkdir -pv ${DEST}/ceph
     pushd ${DEST}/ceph || return
     echo Downloading ${bucket} artifacts ...
