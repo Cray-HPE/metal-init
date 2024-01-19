@@ -60,6 +60,10 @@ if [ -z "${ARTIFACTORY_USER}" ] || [ -z "${ARTIFACTORY_TOKEN}" ]; then
 fi
 
 ARCH=$(uname -m)
+if [ "$ARCH" = 'arm64' ]; then
+    ARCH=aarch64
+fi
+
 DEST="/var/www/ephemeral/data"
 use_proxy=no
 http_proxy='null'
