@@ -60,6 +60,10 @@ if [ -z "${ARTIFACTORY_USER}" ] || [ -z "${ARTIFACTORY_TOKEN}" ]; then
 fi
 
 ARCH=$(uname -m)
+if [ "$ARCH" = 'arm64' ]; then
+    ARCH=aarch64
+fi
+
 DEST="/var/www/ephemeral/data"
 use_proxy=no
 http_proxy='null'
@@ -171,7 +175,7 @@ if [ -n "${KUBERNETES_ID}" ]; then
         stream=stable
     fi
 
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${repository}/${stream}/${bucket}
     mkdir -pv ${DEST}/k8s
     pushd ${DEST}/k8s || return
     echo Downloading ${bucket} artifacts ...
@@ -200,7 +204,7 @@ if [ -n "${PRE_INSTALL_TOOLKIT_ID}" ]; then
         stream=stable
     fi
 
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${repository}/${stream}/${bucket}
     pushd ${DEST} || return
     echo "Downloading ${bucket} ISO with ID: ${PRE_INSTALL_TOOLKIT_ID}"
     if [ "${use_proxy}" = 'yes' ]; then
@@ -223,7 +227,7 @@ if [ -n "${FAWKES_LIVE_ID}" ]; then
         stream=stable
     fi
 
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${repository}/${stream}/${bucket}
     pushd ${DEST} || return
     echo "Downloading ${bucket} ISO with ID: ${FAWKES_LIVE_ID}"
     if [ "${use_proxy}" = 'yes' ]; then
@@ -246,7 +250,7 @@ if [ -n "${HYPERVISOR_ID}" ]; then
         stream=stable
     fi
 
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${repository}/${stream}/${bucket}
     pushd ${DEST} || return
     echo "Downloading ${bucket} ISO with ID: ${HYPERVISOR_ID}"
     if [ "${use_proxy}" = 'yes' ]; then
@@ -269,7 +273,7 @@ if [ -n "${KUBERNETES_VM_ID}" ]; then
         stream=stable
     fi
 
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${repository}/${stream}/${bucket}
     pushd ${DEST} || return
     echo "Downloading ${bucket} ISO with ID: ${KUBERNETES_VM_ID}"
     if [ "${use_proxy}" = 'yes' ]; then
@@ -292,7 +296,7 @@ if [ -n "${MANAGEMENT_VM_ID}" ]; then
         stream=stable
     fi
 
-    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${stream}/${bucket}
+    artifactory_url=https://${ARTIFACTORY_USER}:${ARTIFACTORY_TOKEN}@${base_url}/${repository}/${stream}/${bucket}
     pushd ${DEST} || return
     echo "Downloading ${bucket} ISO with ID: ${MANAGEMENT_VM_ID}"
     if [ "${use_proxy}" = 'yes' ]; then
