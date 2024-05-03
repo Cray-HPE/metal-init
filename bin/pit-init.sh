@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -71,7 +71,7 @@ EOF
 #######################################
 function isgcp {
   # defaults to /etc/google_system, but can be overridden
-  _isgcp_identifier="etc/google_system"
+  _isgcp_identifier="/etc/google_system"
 
   # if the file exists, it is likely on GCP
   [ -e "${_isgcp_identifier}" ] && return 0
@@ -302,13 +302,13 @@ function load_and_start_systemd {
 }
 
 function main {
-  # vshasta does not need certain parts of pit-init or are they incompatible with it
-  if ! isgcp /etc/google_system; then
-    load_csi
-    reload_interfaces
-    load_site_init
+    # vshasta does not need certain parts of pit-init or are they incompatible with it
+    if ! isgcp; then
+        load_csi
+        reload_interfaces
+        load_site_init
+    fi
     load_packages
-  fi
     load_and_start_systemd
     load_ntp
 }
