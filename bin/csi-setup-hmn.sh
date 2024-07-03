@@ -22,29 +22,40 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-set -eu
+set -euo pipefail
+
 if [ $# -lt 1 ]; then
-cat << EOM >&2
-  usage: csi-setup-hmn.sh CIDR|IP/MASQ VLAN_ID
-  i.e.: csi-setup-hmn.sh 10.254.1.1/17 4
+  cat << EOM >&2
+  usage: csi-setup-hmn.sh CIDR VLAN_ID [parent]
+  e.g.
+
+  csi-setup-hmn.sh 10.254.1.1/17 4
+  csi-setup-hmn.sh 10.254.1.1/17 4 em1
 EOM
   exit 1
 fi
-cidr="$1"
-addr="$(echo $cidr | cut -d '/' -f 1)"
-mask="$(echo $cidr | cut -d '/' -f 2)"
-vlan="$(echo $cidr | cut -d '/' -f 3)"
+cidr="${1:-}"
+vlan="${2:-}"
+parent="${3:-bond0}"
 
-cat << EOF >/tmp/ifcfg-bond0.hmn0
+mask="${cidr#*/}"
+
+if [[ ! $vlan =~ [0-9]+ ]] || [ ! "$vlan" -ge 1 ] || [ ! "$vlan" -le 4094 ]; then
+  echo >&2 "Invalid ID for VLAN: $vlan"
+  echo >&2 "VLAN must be an integer where 1 ≤ x ≤ 4094"
+#  exit 1
+fi
+
+cat << EOF > /tmp/ifcfg-bond0.hmn0
 NAME='HMN Bootstrap DHCP Subnet'
 
 # Set static IP (becomes "preferred" if dhcp is enabled)
 BOOTPROTO='static'
-IPADDR='${addr}/${mask}'
+IPADDR='${cidr}'
 PREFIXLEN='${mask}'
 
 # CHANGE AT OWN RISK:
-ETHERDEVICE='bond0'
+ETHERDEVICE='${parent}'
 
 # DO NOT CHANGE THESE:
 VLAN_PROTOCOL='ieee802-1Q'
