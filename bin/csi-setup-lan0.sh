@@ -54,16 +54,33 @@ fi
 hostname_regex='^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$'
 [[ $system_name =~ $hostname_regex ]] || err_exit "$system_name is not a valid hostname"
 
-sed -i "s/^BOOTPROTO=.*/BOOTPROTO='static'/g" /etc/sysconfig/network/ifcfg-lan0
-sed -i 's/^IPADDR=.*/IPADDR="'"${addr}"'\/'"${mask}"'"/g' /etc/sysconfig/network/ifcfg-lan0
-sed -i 's/^PREFIXLEN=.*/PREFIXLEN="'"${mask}"'"/g' /etc/sysconfig/network/ifcfg-lan0
-sed -i 's/^BRIDGE_PORTS=.*/BRIDGE_PORTS="'"$*"'"/g' /etc/sysconfig/network/ifcfg-lan0
+cat << EOF >/etc/sysconfig/network/ifcfg-lan0
+NAME='External Site-Link'
+
+# Select the NIC(s) for direct, external access.
+BRIDGE_PORTS='$*'
+
+# Set static IP (becomes "preferred" if dhcp is enabled)
+# NOTE: IPADDR's route will override DHCPs.
+BOOTPROTO='static'
+IPADDR='${addr}/${mask}'
+PREFIXLEN='${mask}'
+
+# DO NOT CHANGE THESE:
+ONBOOT='yes'
+STARTMODE='auto'
+BRIDGE='yes'
+BRIDGE_STP='no'
+EOF
+
 echo "default $gateway - -" >/etc/sysconfig/network/ifroute-lan0
+
 sed -i 's/NETCONFIG_DNS_STATIC_SERVERS=.*/NETCONFIG_DNS_STATIC_SERVERS="'"${dns:-9.9.9.9}"'"/' /etc/sysconfig/network/config
 
 netconfig update -f || err_exit "netconfig update -f failed"
 wicked ifdown lan0 || err_exit "wicked ifdown lan0 failed"
 wicked ifup lan0 || err_exit "wicked ifup lan0 failed"
+
 # Shake out daemon handling of new lan0 name.
 systemctl restart wickedd-nanny || err_exit "systemctl restart wickedd-nanny failed"
 hostnamectl set-hostname ${system_name}-pit || err_exit "hostnamectl set-hostname ${system_name}-pit failed"

@@ -34,7 +34,25 @@ cidr="$1"
 addr="$(echo $cidr | cut -d '/' -f 1)"
 mask="$(echo $cidr | cut -d '/' -f 2)"
 vlan="$(echo $cidr | cut -d '/' -f 3)"
-sed -i 's/^IPADDR=.*/IPADDR="'"${addr}"'\/'"${mask}"'"/g' /etc/sysconfig/network/ifcfg-bond0.hmn0
-sed -i 's/^PREFIXLEN=.*/PREFIXLEN="'"${mask}"'"/g' /etc/sysconfig/network/ifcfg-bond0.hmn0
-sed -i 's/^VLANID=.*/VLANID="'"${vlan:-4}"'"/g' /etc/sysconfig/network/ifcfg-bond0.hmn0
+
+cat << EOF >/tmp/ifcfg-bond0.hmn0
+NAME='HMN Bootstrap DHCP Subnet'
+
+# Set static IP (becomes "preferred" if dhcp is enabled)
+BOOTPROTO='static'
+IPADDR='${addr}/${mask}'
+PREFIXLEN='${mask}'
+
+# CHANGE AT OWN RISK:
+ETHERDEVICE='bond0'
+
+# DO NOT CHANGE THESE:
+VLAN_PROTOCOL='ieee802-1Q'
+VLAN='yes'
+VLAN_ID=${vlan}
+ONBOOT='yes'
+STARTMODE='auto'
+EOF
+
 wicked ifreload bond0.hmn0
+systemctl restart wickedd-nanny
