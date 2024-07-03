@@ -22,29 +22,28 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-set -eu
+set -euo pipefail
+
 if [ $# -lt 3 ]; then
-cat << EOM >&2
-    usage: csi-setup-bond0.sh CIDR|IP/MASQ FIRST_BOND_MEMBER SECOND_BOND_MEMBER
-    i.e.: csi-setup-bond0.sh 10.1.1.1/16 p801p1 p801p2
+  cat << EOM >&2
+  usage: csi-setup-bond0.sh CIDR BOND_MEMBER [... BOND_MEMBER_N]
+
+  e.g.
+
+  csi-setup-bond0.sh 10.1.1.1/16 p801p1 p801p2
 EOM
   exit 1
 fi
-cidr="$1"
-addr="$(echo $cidr | cut -d '/' -f 1)"
-mask="$(echo $cidr | cut -d '/' -f 2)"
-dev1="$2"
-dev2="$3"
-cat << EOF >/etc/sysconfig/network/ifcfg-bond0
-NAME='Internal Interface'
+cidr="${1:-}" && shift
 
-# Select the NIC(s) for access to the CRAY.
-BONDING_SLAVE0='${dev1}'
-BONDING_SLAVE1='${dev2}'
+mask="${cidr#*/}"
+
+cat << EOF > /etc/sysconfig/network/ifcfg-bond0
+NAME='Internal Interface'
 
 # Set static IP (becomes "preferred" if dhcp is enabled)
 BOOTPROTO='static'
-IPADDR='${addr}/${mask}'
+IPADDR='${cidr}'
 PREFIXLEN='${mask}'
 
 # CHANGE AT OWN RISK:
@@ -54,7 +53,23 @@ BONDING_MODULE_OPTS='mode=802.3ad miimon=100 lacp_rate=fast xmit_hash_policy=lay
 ONBOOT='yes'
 STARTMODE='auto'
 BONDING_MASTER='yes'
+
+# BOND MEMBERS:
 EOF
+
+devs=("$@")
+for i in "${!devs[@]}"; do
+  echo "BONDING_SLAVE${i}='${devs[$i]}'" >> /etc/sysconfig/network/ifcfg-bond0
+done
 
 wicked ifreload bond0
 systemctl restart wickedd-nanny
+
+echo 'Done.'
+cat << EOM >&2
+If interface changes do not appear right away, check again in 5-10 seconds. Otherwise triage further with:
+
+  wicked ifstatus --verbose bond0
+  grep bond0 /var/log/messages*
+
+EOM
