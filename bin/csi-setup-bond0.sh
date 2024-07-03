@@ -52,7 +52,7 @@ BONDING_MODULE_OPTS='mode=802.3ad miimon=100 lacp_rate=fast xmit_hash_policy=lay
 
 # DO NOT CHANGE THESE:
 ONBOOT='yes'
-STARTMODE='manual'
+STARTMODE='auto'
 BONDING_MASTER='yes'
 EOF
 
