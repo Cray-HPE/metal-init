@@ -2,7 +2,7 @@
 
 # MIT License
 #
-# (C) Copyright [2022] Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,7 +21,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-
+#
 set -euo pipefail
 
 if [ $# -lt 3 ]; then
