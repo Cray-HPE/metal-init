@@ -22,48 +22,55 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-set -eu
+set -euo pipefail
 
 function err_exit() {
-    echo "Error: $1" >&2
-    exit 1
+  echo "Error: $1" >&2
+  exit 1
 }
 
 set +x
 if [ $# -lt 5 ]; then
-cat << EOM >&2
-  usage: csi-setup-lan0.sh SYSTEM_NAME CIDR|IP/MASQ GATEWAY DNS1 DEVICE1 [DEVICE2 DEVICEN]
-         csi-setup-lan0.sh SYSTEM_NAME CIDR|IP/MASQ GATEWAY 'DNS1 DNS2 DNSN' DEVICE1 [DEVICE2 DEVICEN]
-  i.e.: csi-setup-lan0.sh your-system-name 172.29.16.5/20 172.29.16.1 172.30.84.40 em1 [em2]
+  cat << EOM >&2
+  usage: csi-setup-lan0.sh SYSTEM_NAME CIDR GATEWAY DNS1 DEVICE1 [... DEVICE_N]
+         csi-setup-lan0.sh SYSTEM_NAME CIDR GATEWAY 'DNS1 DNS2 DNSN' DEVICE1 [... DEVICE_N]
+
+  e.g.
+
+  csi-setup-lan0.sh eniac 10.100.254.5/24 10.100.254.1 "16.110.135.51,16.110.135.52" em1 em2
 EOM
   exit 1
 fi
 
-system_name="$1" && shift
-cidr="$1" && shift
-gateway="$1" && shift
-dns="$1" && shift
-addr="$(echo $cidr | cut -d '/' -f 1)"
-mask="$(echo $cidr | cut -d '/' -f 2)"
+system_name="${1:-}" && shift
+cidr="${1:-}" && shift
+gateway="${1:-}" && shift
+dns="${1:-}" && shift
+mask="${cidr#*/}"
+bridge_ports="$*"
 
 # https://en.wikipedia.org/wiki/Hostname
 if [[ ${#system_name} -gt 253 ]]; then
-    echo "Error: \$system_name must be less than or equal to 253 ASCII characters" 2>&1
-    exit 1
+  echo 'Error: $system_name must be less than or equal to 253 ASCII characters' 2>&1
+  exit 1
 fi
 hostname_regex='^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$'
-[[ $system_name =~ $hostname_regex ]] || err_exit "$system_name is not a valid hostname"
+if [[ ! $system_name =~ $hostname_regex ]]; then
+  echo >&2 "$system_name is not a valid hostname"
+  echo >&2 "must match regex: $hostname_regex"
+  exit 1
+fi
 
-cat << EOF >/etc/sysconfig/network/ifcfg-lan0
+cat << EOF > /etc/sysconfig/network/ifcfg-lan0
 NAME='External Site-Link'
 
 # Select the NIC(s) for direct, external access.
-BRIDGE_PORTS='$*'
+BRIDGE_PORTS='${bridge_ports}'
 
 # Set static IP (becomes "preferred" if dhcp is enabled)
 # NOTE: IPADDR's route will override DHCPs.
 BOOTPROTO='static'
-IPADDR='${addr}/${mask}'
+IPADDR='${cidr}'
 PREFIXLEN='${mask}'
 
 # DO NOT CHANGE THESE:
@@ -73,15 +80,20 @@ BRIDGE='yes'
 BRIDGE_STP='no'
 EOF
 
-echo "default $gateway - -" >/etc/sysconfig/network/ifroute-lan0
+echo "default $gateway - -" > /etc/sysconfig/network/ifroute-lan0
 
-sed -i 's/NETCONFIG_DNS_STATIC_SERVERS=.*/NETCONFIG_DNS_STATIC_SERVERS="'"${dns:-9.9.9.9}"'"/' /etc/sysconfig/network/config
+echo "Updating DNS ... "
+sed -i'.bak' 's/NETCONFIG_DNS_STATIC_SERVERS=.*/NETCONFIG_DNS_STATIC_SERVERS="'"${dns}"'"/' /etc/sysconfig/network/config
+echo "Backed up /etc/sysconfig/network/config to /etc/sysconfig/network/config.bak"
+netconfig update -f || err_exit "'netconfig update -f' failed"
+echo 'Updated /etc/resolv.conf'
 
-netconfig update -f || err_exit "netconfig update -f failed"
-wicked ifdown lan0 || err_exit "wicked ifdown lan0 failed"
-wicked ifup lan0 || err_exit "wicked ifup lan0 failed"
-
+echo -n 'Reloading lan0 sysconfig ... '
+wicked ifreload lan0 || err_exit "'wicked ifreload lan0' failed"
 # Shake out daemon handling of new lan0 name.
-systemctl restart wickedd-nanny || err_exit "systemctl restart wickedd-nanny failed"
-hostnamectl set-hostname ${system_name}-pit || err_exit "hostnamectl set-hostname ${system_name}-pit failed"
-echo
+systemctl restart wickedd-nanny || err_exit "'systemctl restart wickedd-nanny' failed."
+echo 'Done'
+
+echo -n 'Setting hostname ... '
+hostnamectl set-hostname "${system_name}-pit" || err_exit "'hostnamectl set-hostname ${system_name}-pit' failed."
+echo 'Done'
