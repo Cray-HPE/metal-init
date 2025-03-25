@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -36,7 +36,7 @@ range_start="$2"
 range_end="$3"
 lease_ttl="${4:-10m}"
 
-cat << EOF > /etc/dnsmasq.d/hmn.conf
+cat << EOF > /etc/dnsmasq.d/HMN.conf
 # HMN:
 server=/hmn/
 address=/hmn/
