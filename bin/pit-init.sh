@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -80,6 +80,23 @@ function isgcp {
   # if not, we conclude that this is not GCP
   lsblk --noheadings -o vendor | grep -q Google
   return $?
+}
+
+# Gets the patch command depending on the version of CSI, mainly as a method of bypassing a deprecation notice.
+function csi_patch_pit_cmd {
+  local version
+  local compare
+  version="$(rpm -q --queryformat '%{VERSION}' cray-site-init 2>/dev/null)"
+  if [ -z "$version" ]; then
+    echo >&2 "cray-site-init was not installed!"
+    return 1
+  fi
+  compare="$(python -c 'from packaging.version import Version; print(Version("'"$version"'") < Version("2.0.0"))')"
+  if [ "$compare" = 'True' ]; then
+    echo "csi patch"
+  else
+    echo "csi patch pit"
+  fi
 }
 
 function init {
@@ -204,7 +221,8 @@ function load_site_init {
 
     if [ $site_init_error = 0 ] ; then
         echo 'Patching CA into data.json (cloud-init)'
-        csi patch ca --cloud-init-seed-file ${CONF_DIR}/data.json --customizations-file ${site_init}/customizations.yaml --sealed-secret-key-file ${site_init}/certs/sealed_secrets.key
+        patch_cmd="$(csi_patch_pit_cmd)"
+        ${patch_cmd} ca --cloud-init-seed-file ${CONF_DIR}/data.json --customizations-file ${site_init}/customizations.yaml --sealed-secret-key-file ${site_init}/certs/sealed_secrets.key
         echo 'Basecamp will need to be restarted in order to pickup the new CA - pit-init will restart this shortly.'
     else
         error "site-init does not exist at the expected location: $site_init"
@@ -221,9 +239,10 @@ function load_packages {
         return 0
     fi
 
-    # `csi patch packages` will return 0 if the command does not exist, 1 otherwise.
-    if csi patch packages >/dev/null 2>&1; then
-        echo 'The installed version of CSI does not have the `csi patch packages` command. data.json will not be patched with packages and repository manifests.'
+    # `csi patch` will return 0 if the command does not exist, 1 otherwise.
+    patch_cmd="$(csi_patch_pit_cmd)"
+    if ${patch_cmd} packages >/dev/null 2>&1; then
+        echo "The installed version of CSI does not have the ${patch cmd} command. data.json will not be patched with packages and repository manifests."
         return 0
     fi
 
@@ -246,7 +265,7 @@ function load_packages {
         config_file="$package_file"
     fi
 
-    csi patch packages --cloud-init-seed-file "${CONF_DIR}/data.json" --config-file "$config_file"
+    ${patch_cmd} packages --cloud-init-seed-file "${CONF_DIR}/data.json" --config-file "$config_file"
     echo 'Basecamp will need to be restarted in order to pickup the new repo and package lists - pit-init will restart this shortly.'
 }
 
