@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,7 @@ export PITDATA="${PITDATA:-}"
 export SYSTEM_NAME="${SYSTEM_NAME:-}"
 
 function die () {
-    echo >&2 ${1:-'Fatal Error!'}
+    echo >&2 "${1:-'Fatal Error!'}"
     exit 1
 }
 
@@ -82,6 +82,23 @@ function isgcp {
   return $?
 }
 
+# Gets the patch command depending on the version of CSI, mainly as a method of bypassing a deprecation notice.
+function csi_patch_pit_cmd {
+  local version
+  local compare
+  version="$(rpm -q --queryformat '%{VERSION}' cray-site-init 2>/dev/null)"
+  if [ -z "$version" ]; then
+    echo >&2 "cray-site-init was not installed!"
+    return 1
+  fi
+  compare="$(python -c 'from packaging.version import Version; print(Version("'"$version"'") < Version("2.0.0"))')"
+  if [ "$compare" = 'True' ]; then
+    echo "csi patch"
+  else
+    echo "csi patch pit"
+  fi
+}
+
 function init {
 
     echo 'Exporting tokens'
@@ -113,11 +130,11 @@ function init {
     export CONF_DIR=${PITDATA}/configs
 
     # Create our base directories if they do not already exist.
-    if [ ! -d $DATA_DIR ]; then
-        mkdir -pv $DATA_DIR
+    if [ ! -d "$DATA_DIR" ]; then
+        mkdir -pv "$DATA_DIR"
     fi
-    if [ ! -d $CONF_DIR ]; then
-        mkdir -pv $CONF_DIR
+    if [ ! -d "$CONF_DIR" ]; then
+        mkdir -pv "$CONF_DIR"
     fi
 }
 
@@ -125,23 +142,23 @@ function load_csi {
 
     local csi_conf=${PREP_DIR}/system_config.yaml
 
-    if [ ! -f $csi_conf ] ; then
+    if [ ! -f "$csi_conf" ] ; then
         # TODO: MTL-1695 Update this to point to the new example system_config.yaml file.
         error "CSI needs inputs; no $csi_conf file detected!"
         die 'See: https://github.com/Cray-HPE/docs-csm/blob/main/install/prepare_configuration_payload.md'
     fi
 
     echo 'Generating Configuration ...'
-    pushd $PREP_DIR
+    pushd "$PREP_DIR"
     if [ -z "$SYSTEM_NAME" ]; then
         SYSTEM_NAME=$(awk /system-name/'{print $NF}' < system_config.yaml)
     fi
-    [ -d $SYSTEM_NAME ] && mv $SYSTEM_NAME $SYSTEM_NAME-"$(date '+%Y%m%d%H%M%S')"
+    [ -d "$SYSTEM_NAME" ] && mv "$SYSTEM_NAME" "$SYSTEM_NAME"-"$(date '+%Y%m%d%H%M%S')"
     csi config init
-    cp -pv $SYSTEM_NAME/pit-files/* /etc/sysconfig/network/
-    cp -pv $SYSTEM_NAME/dnsmasq.d/* /etc/dnsmasq.d/
-    cp -pv $SYSTEM_NAME/basecamp/data.json "$PITDATA/configs/"
-    cp -pv $SYSTEM_NAME/conman.conf /etc
+    cp -pv "$SYSTEM_NAME"/pit-files/* /etc/sysconfig/network/
+    cp -pv "$SYSTEM_NAME"/dnsmasq.d/* /etc/dnsmasq.d/
+    cp -pv "$SYSTEM_NAME"/basecamp/data.json "$PITDATA/configs/"
+    cp -pv "$SYSTEM_NAME"/conman.conf /etc
     popd
 }
 
@@ -173,22 +190,22 @@ function load_site_init {
 
     # Resolve CSM_PATH and the yq binary.
     if ! command -v $yq_binary >/dev/null ; then
-        if [ -z ${CSM_PATH} ] ; then
+        if [ -z "${CSM_PATH}" ] ; then
             error "Can not find CSM tarball providing the yq binary, CSM_PATH is empty!"
             yq_error=1
-        elif [ ! -d ${CSM_PATH} ] ; then
+        elif [ ! -d "${CSM_PATH}" ] ; then
             error "Can not find CSM_PATH: $CSM_PATH ; no such directory"
             yq_error=1
         fi
         yq_binary="${CSM_PATH}/shasta-cfg/utils/bin/$(uname | awk '{print tolower($0)}')/yq"
-        if [ ! -f ${yq_binary} ] ; then
+        if [ ! -f "${yq_binary}" ] ; then
             error "Can not find yq binary at $yq_binary"
             yq_error=1
         fi
     fi
 
     # Resolve site_init.
-    if [ ! -d $site_init ] ; then
+    if [ ! -d "$site_init" ] ; then
         error "Need $site_init; this needs to be created. Create this before re-running $0!"
         error "See: https://github.com/Cray-HPE/docs-csm/blob/main/install/prepare_site_init.md#create-and-initialize-site-init-directory"
         return 1
@@ -197,14 +214,15 @@ function load_site_init {
     # YQ Merge CSI Customizations.yaml into site-inits; merge the CA cert data.
     if [ $yq_error = 0 ] ; then
         echo 'Merging Generated IPs into customizations.yaml'
-        "$yq_binary" merge -xP -i ${site_init}/customizations.yaml <($yq_binary prefix -P "${PREP_DIR}/${SYSTEM_NAME}/customizations.yaml" spec)
+        "$yq_binary" merge -xP -i "${site_init}/customizations.yaml" <($yq_binary prefix -P "${PREP_DIR}/${SYSTEM_NAME}/customizations.yaml" spec)
     else
         error 'yq is not available for merging generated IPs into customizations.yaml!'
     fi
 
     if [ $site_init_error = 0 ] ; then
         echo 'Patching CA into data.json (cloud-init)'
-        csi patch ca --cloud-init-seed-file ${CONF_DIR}/data.json --customizations-file ${site_init}/customizations.yaml --sealed-secret-key-file ${site_init}/certs/sealed_secrets.key
+        patch_cmd="$(csi_patch_pit_cmd)"
+        ${patch_cmd} ca --cloud-init-seed-file "${CONF_DIR}/data.json" --customizations-file "${site_init}/customizations.yaml" --sealed-secret-key-file "${site_init}/certs/sealed_secrets.key"
         echo 'Basecamp will need to be restarted in order to pickup the new CA - pit-init will restart this shortly.'
     else
         error "site-init does not exist at the expected location: $site_init"
@@ -221,15 +239,16 @@ function load_packages {
         return 0
     fi
 
-    # `csi patch packages` will return 0 if the command does not exist, 1 otherwise.
-    if csi patch packages >/dev/null 2>&1; then
-        echo 'The installed version of CSI does not have the `csi patch packages` command. data.json will not be patched with packages and repository manifests.'
+    # `csi patch` will return 0 if the command does not exist, 1 otherwise.
+    patch_cmd="$(csi_patch_pit_cmd)"
+    if ${patch_cmd} packages >/dev/null 2>&1; then
+        echo "The installed version of CSI does not have the '$patch_cmd' command. data.json will not be patched with packages and repository manifests."
         return 0
     fi
 
     if [ -z "${package_file}" ]; then
         if [ -z "${CSM_RELEASE}" ]; then
-            error 'No CSM tarball could be resolved, CSM_RELEASE was unset! If this is intentional, re-run this script with `-P` to skip this step or provide a custom cloud-init.yaml file with `-p`.'
+            error 'No CSM tarball could be resolved, CSM_RELEASE was unset! If this is intentional, re-run this script with "-P" to skip this step or provide a custom cloud-init.yaml file with "-p".'
         elif [ ! -d "$csm_path" ]; then
             error "The CSM tarball is either missing, or was never extracted! Could not find $csm_path"
         elif [ ! -f "$csm_path/rpm/cloud-init.yaml" ]; then
@@ -246,7 +265,7 @@ function load_packages {
         config_file="$package_file"
     fi
 
-    csi patch packages --cloud-init-seed-file "${CONF_DIR}/data.json" --config-file "$config_file"
+    ${patch_cmd} packages --cloud-init-seed-file "${CONF_DIR}/data.json" --config-file "$config_file"
     echo 'Basecamp will need to be restarted in order to pickup the new repo and package lists - pit-init will restart this shortly.'
 }
 
@@ -277,10 +296,10 @@ function load_and_start_systemd {
     for service in "${services[@]}"; do
         retries=0
         verb=start
-        systemctl stop $service
-        systemctl enable $service >/dev/null 2>&1
-        printf 'Starting %-30s ... ' $service
-        while ! time systemctl $verb $service >/dev/null 2>&1 ; do
+        systemctl stop "$service"
+        systemctl enable "$service" >/dev/null 2>&1
+        printf 'Starting %-30s ... ' "$service"
+        while ! time systemctl $verb "$service" >/dev/null 2>&1 ; do
             if [[ $retries -ge $max_retries ]]; then
                 error=1
                 break
