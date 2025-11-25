@@ -34,7 +34,7 @@ function call_bmc {
     local vendor
     local channel=1 # GB & HPE
 
-    expected_bmcs="$(grep -P 'host-record=ncn-\w\d+-mgmt' /etc/dnsmasq.d/statics.conf | grep -v m001 | wc -l)"
+    expected_bmcs="$(grep -E 'host-record=(ncn-[a-z][0-9]+|fmn[0-9]+)-mgmt' /etc/dnsmasq.d/statics.conf | grep -v m001 | wc -l)"
     vendor="$(ipmitool fru | awk '/Board Mfg/ && !/Date/ {print $4}')"
     if [[ "$vendor" = *Intel* ]]; then
         channel=3
@@ -106,7 +106,7 @@ else
     echo -e >&2 "\tWARNING: CSM_RELEASE was not set, images will be stored in their default location on the node(s) at /run/initramfs/live/LiveOS/"
 fi
 
-readarray -t NCNS_K8S < <(grep -Eo 'ncn-[mw]\w+' /var/lib/misc/dnsmasq.leases | sort -u)
+readarray -t NCNS_K8S < <(grep -Eo '(ncn-[mw][0-9]+|fmn[0-9]+)' /var/lib/misc/dnsmasq.leases | sort -u)
 if [ "${#NCNS_K8S[@]}" = 0 ]; then
     echo >&2 'No kubernetes NCN BMCs found in /var/lib/misc/dnsmasq.leases'
     exit 1
@@ -114,7 +114,7 @@ fi
 for ncn in "${NCNS_K8S[@]}"; do
     mkdir -p ${ncn} && pushd ${ncn} >/dev/null
     cp -p /var/www/boot/script.ipxe .
-    if [[ "$ncn" =~ 'ncn-w' ]]; then
+    if [[ "$ncn" =~ 'ncn-w' ]] || [[ "$ncn" =~ 'fmn' ]]; then
         sed -i -E 's/rd.luks(=1)?\s/rd.luks=0 /g' script.ipxe
     fi
     ln -snf ..${k8s_kernel///var\/www} kernel
@@ -122,7 +122,7 @@ for ncn in "${NCNS_K8S[@]}"; do
     ln -snf ..${k8s_squashfs///var\/www} rootfs
     popd >/dev/null
 done
-readarray -t NCNS_CEPH < <(grep -Eo 'ncn-s\w+' /var/lib/misc/dnsmasq.leases | sort -u)
+readarray -t NCNS_CEPH < <(grep -Eo 'ncn-s[0-9]+' /var/lib/misc/dnsmasq.leases | sort -u)
 if [ "${#NCNS_CEPH[@]}" = 0 ]; then
     echo >&2 'No storage NCN BMCs found in /var/lib/misc/dnsmasq.leases'
     exit 1
@@ -137,7 +137,7 @@ for ncn in "${NCNS_CEPH[@]}"; do
 done
 
 if ! [ "$(pwd)" = $WEB_ROOT ]; then
-    rsync -rltDvq --remove-source-files ncn-* $WEB_ROOT 2>/dev/null && rmdir ncn-*
+    rsync -rltDvq --remove-source-files ncn-* fmn* $WEB_ROOT 2>/dev/null && rmdir ncn-* fmn* 2>/dev/null || true
 fi
 
 echo '/var/www is ready.'
